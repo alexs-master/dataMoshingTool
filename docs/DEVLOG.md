@@ -6,6 +6,39 @@
 
 ---
 
+## 2026-06-19 (sex) — BLOCO 1: núcleo validado (de-risco concluído) ✅
+
+- ✅ Protótipo do núcleo rodado **de verdade** no Chrome (via DevTools/JS, não pseudocódigo):
+  encoder com GOP controlado → captura de chunks → manipulação → decode. Testado fora do
+  `index.html` (script direto no console) para validar a API antes de estruturar a UI.
+- **GOP controlado confirmado:** `keyFrame:true` nos frames exatos pedidos (0 e 30) — `keyIndices:[0,30]`
+  exatamente como configurado. `avc1.42001f` + `latencyMode:"realtime"` + `avc:{format:"avc"}`.
+- **MELT — confirmado, funciona direto:** removendo o chunk `key` do corte (frame 30), o decode
+  NÃO erra (59 frames decodificados) e o pixel amostrado pós-corte ficou com a cor da CENA ANTERIOR
+  (distância de cor 232/441 vs. o decode limpo) — prova pixel-level do "vazamento" de cena. Nenhuma
+  config especial necessária.
+- **BLOOM — funciona, mas precisa de uma config específica:** duplicar o chunk `delta` ali sem
+  mais nada faz o decoder **abortar** ("Decoding error", só 11/85 frames) — Chrome valida
+  `frame_num` no slice header (campo do H.264) e um decoder estrito rejeita duplicatas. Software
+  decoder (`prefer-software`) também aborta. **Hardware decoder (`hardwareAcceleration:
+  'prefer-hardware'`) tolera via concealment e decodifica tudo (55/55).** Confirmado que é
+  glitch real (não congelamento): a barra de teste derrapa de posição e depois some — motion
+  vectors reaplicando contra referência cada vez mais errada.
+- **CORRUPT — funciona, mas com teto de densidade:** com `prefer-hardware`, corrupção **sparsa**
+  (XOR a cada 20 bytes, pulando os ~6 primeiros bytes do NAL) decodifica 100% (40/40) e produz
+  diferença visual real a partir do frame corrompido, propagando por 25 frames seguintes (até
+  faltar um keyframe novo) — exatamente o comportamento esperado de corrupção de P-frame. Densidade
+  maior (a cada 7 ou 2 bytes) faz o decoder abortar, mesmo em hardware.
+- **⚠️ Implicação de produto:** o decoder de PREVIEW/PLAYBACK da ferramenta deve sempre configurar
+  `hardwareAcceleration:'prefer-hardware'`. O parâmetro de "intensidade" da corrupção precisa ter
+  um teto seguro (stride mínimo ~15-20) — exibir/permitir além disso só com aviso de risco de abortar.
+- **Risco geral do PLAN (H.264 "limpar" o glitch via deblocking) NÃO se confirmou** — os três
+  efeitos sobrevivem em H.264 nativo do browser; não foi necessário considerar MPEG-4/ffmpeg.wasm.
+- ➡️ Próximo: Bloco 0 (estrutura do `index.html` limpo) + Bloco 2 (plugar produtores reais:
+  upload de vídeo/imagem) usando exatamente esta config validada.
+
+---
+
 ## 2026-06-18 (qui) — Política de documentação total + PROCESSO.md
 
 - ⚠️ **Diretriz permanente do usuário:** "todo o processo deve ser documentado. Tudo." Vale daqui

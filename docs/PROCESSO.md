@@ -92,6 +92,35 @@
   (escopo `repo`); `gh auth setup-git` p/ o git usar essa conta.
 - Repositório **PÚBLICO** criado e com push: **https://github.com/alexs-master/dataMoshingTool**.
 - Objetivo: habilitar **sessões na nuvem** com o PC desligado.
+- Também fixada **política de documentação total** (diretriz do usuário) e criado `PROCESSO.md`
+  (este documento) como registro narrativo completo, complementar ao `DEVLOG.md` (log curto) e ao
+  `00-MASTER.md` (snapshot de estado).
+
+### Fase 10 — Bloco 1: validação real do núcleo de bitstream (2026-06-19)
+- Em vez de só planejar, **rodei o protótipo de verdade** no navegador (via Chrome DevTools/JS,
+  fora do `index.html`) para validar o risco central do projeto antes de construir qualquer UI.
+- Testadas as 3 técnicas de mosh com chunks reais de um encoder H.264 (`avc1.42001f`,
+  `latencyMode:"realtime"`, GOP forçado): **melt** (remover chunk `key`), **bloom** (duplicar chunk
+  `delta`), **corrupt** (XOR em bytes de chunk `delta`).
+- **Melt confirmado funcionando puro**, sem nenhuma config extra — prova pixel-level (distância de
+  cor 232/441 entre decode limpo e moshado, exatamente onde a cena deveria ter mudado).
+- **Achado não previsto:** bloom e corrupt, feitos do jeito ingênuo, fazem o `VideoDecoder` do
+  Chrome **abortar** com erro ("Decoding error") em vez de produzir glitch — porque o H.264 exige
+  continuidade estrita do campo `frame_num` no slice header, e um decoder rigoroso (software/CPU)
+  rejeita streams "incorretos". **Solução encontrada por teste empírico:** configurar o decoder
+  com `hardwareAcceleration:'prefer-hardware'` — o decoder de hardware faz *concealment* (tolera o
+  erro de spec) e revela o artefato visual real (confirmado: o elemento de teste derrapa de posição
+  e se desfaz, não congela — prova de que são os motion vectors se reaplicando, não um freeze).
+- **Segundo achado:** a corrupção de bytes tem um **teto de densidade** — esparsa (1 a cada ~20
+  bytes) sobrevive e propaga visualmente por dezenas de frames; mais densa que isso (1 a cada 7 ou
+  2 bytes) derruba o decoder mesmo em modo hardware. Vira parâmetro de UI com piso de segurança.
+- **Consequência para o plano:** o risco "H.264 pode limpar o glitch via deblocking" (que motivava
+  um possível plano B com MPEG-4/ffmpeg.wasm) **não se confirmou da forma esperada** — o problema
+  real não era o deblocking, era a validação de spec do decoder, resolvida com uma flag de
+  configuração. **Plano B descartado como desnecessário.**
+- Docs atualizados com os parâmetros corretos: `PLAN.md` §2b/2d/§5 (pseudocódigo corrigido,
+  riscos marcados como resolvidos), `00-MASTER.md` (status, próxima ação, seção de riscos
+  reescrita como "resultado"), `DEVLOG.md` (entrada detalhada com todos os números do experimento).
 
 ---
 
@@ -108,6 +137,8 @@
 | D7 | Sem geradores/efeitos artísticos; sem fonte procedural no produto | Ferramenta é só de datamosh | 6 |
 | D8 | Resumo da cliente **sem perguntas e sem "2ª etapa"** | Pedido do usuário | 7 |
 | D9 | Repositório **público** no GitHub (conta `alexs-master`) | Habilitar sessões na nuvem; escolha do usuário | 9 |
+| D10 | Decoder de preview/playback sempre com `hardwareAcceleration:'prefer-hardware'` | Decoder de software aborta bloom/corrupt por validação estrita de `frame_num`; hardware tolera via concealment e revela o glitch real (achado empírico) | 10 |
+| D11 | Corrupção de bytes com piso de densidade segura (stride ~15–20) na UI | Densidade maior derruba o decode mesmo em hardware (achado empírico) | 10 |
 
 ---
 

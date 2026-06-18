@@ -8,11 +8,12 @@
 
 ## ⏱️ STATUS ATUAL  ·  PRÓXIMA AÇÃO
 
-- **Fase:** PLANEJAMENTO concluído. Nada de código ainda.
+- **Fase:** BUILD em andamento. Bloco 1 (núcleo) **validado e concluído** ✅ — melt/bloom/corrupt
+  confirmados reais via teste ao vivo no Chrome, com os parâmetros corretos (ver §RISCOS abaixo).
 - **Prazo de entrega:** SÁBADO 2026-06-20.
-- **Janela de build:** SEXTA 2026-06-19 (usuário offline quinta à noite → sexta).
-- **➡️ PRÓXIMA AÇÃO ao retomar:** Bloco 0 (criar `index.html` LIMPO e portar só os utils base —
-  NÃO clonar o Loop Lab) → Bloco 1 (protótipo isolado do núcleo de mosh e **ver o smear real**).
+- **Janela de build:** SEXTA 2026-06-19.
+- **➡️ PRÓXIMA AÇÃO ao retomar:** Bloco 0 (criar `index.html` LIMPO, portar utils base) usando a
+  config validada do núcleo → Bloco 2 (plugar produtores reais: upload de vídeo/imagem).
 - **Log de progresso:** ver `DEVLOG.md` (atualizar a cada etapa).
 
 ---
@@ -116,17 +117,27 @@ Pseudocódigo completo em `PLAN.md` §2.
 | 6 | 1h | Polish, presets JSON+seed, deploy Vercel |
 
 **Regra de ouro:** se o Bloco 1 mostrar smear real, o resto é montagem em volta do núcleo.
+**✅ Mostrou — Bloco 1 concluído em 2026-06-19.**
 
 ---
 
-## ⚠️ RISCOS A VALIDAR NO BLOCO 1
+## ✅ BLOCO 1 — RESULTADO (validado ao vivo, 2026-06-19)
 
-1. `VideoEncoder` baseline + `latencyMode:"realtime"` emite GOP de 1 key SEM B-frames?
-2. Mediabunny `EncodedVideoPacketSource` aceita packets duplicados/re-timestampados e stream começando em key?
-3. `VideoDecoder` precisa do `decoderConfig.description` (avcC) → capturar no 1º `output.metadata`.
-4. Se H.264 limpar demais o glitch (deblocking) na REMOÇÃO de I-frame → usar a técnica de
-   **corrupção de bytes de delta** (técnica B), que a bíblia faz em H.264 e garante o visual sujo.
-   MPEG-4 ASP/AVI via `ffmpeg.wasm` vira plano C (provavelmente desnecessário).
+1. ✅ GOP totalmente controlado: `keyFrame:true` nos frames exatos pedidos, confirmado.
+2. ✅ `description` (avcC) do encoder capturado via `meta.decoderConfig.description` — necessário p/ o decoder.
+3. ✅ **Melt funciona puro**, sem config especial. Prova pixel-level: cor da cena anterior vazando
+   pós-corte (distância de cor 232/441 vs. decode limpo).
+4. ⚠️→✅ **Bloom e Corrupt exigem `hardwareAcceleration:'prefer-hardware'` no `VideoDecoder`** —
+   achado não previsto no plano original. Sem isso, o decoder (software/no-preference) **aborta**
+   por validação estrita do `frame_num` do H.264; o de hardware faz concealment e revela o glitch
+   real (confirmado visualmente: objeto derrapa/desfaz, não congela).
+5. 🆕 **Corrupt tem teto de densidade**: stride seguro ~15–20 bytes; mais denso aborta o decode
+   mesmo em hardware → vira parâmetro de UI com piso mínimo.
+6. **MPEG-4/ffmpeg.wasm (plano B) não foi necessário** — H.264 nativo do browser basta para as 3 técnicas.
+7. ⏳ Ainda não testado: Mediabunny `EncodedVideoPacketSource` com packets duplicados/re-timestampados
+   (testar no Bloco 4/export).
+
+Detalhes completos do experimento: `DEVLOG.md` (entrada 2026-06-19) e `PLAN.md` §2/§5.
 
 ---
 

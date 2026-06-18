@@ -58,7 +58,10 @@ RGB channel shift, channel displacement, corrupção de bytes.
 
 ---
 
-## 2. O núcleo NOVO (a única parte de risco) — `mosh.js` lógico
+## 2. O núcleo — `mosh.js` lógico ✅ VALIDADO (Bloco 1 rodado de verdade em 2026-06-19)
+
+> Testado ao vivo no Chrome (não é só pseudocódigo). Resultados e parâmetros corretos abaixo.
+> Ver `DEVLOG.md` 2026-06-19 para os números do experimento.
 
 ### 2a. Encoder com GOP controlado (produz chunks moshaveis)
 ```
@@ -77,11 +80,25 @@ enc.encode(new VideoFrame(canvas, {timestamp:i*1e6/fps}),
 ```
 `latencyMode:"realtime"` + baseline profile = sem B-frames, single-reference → mosh limpo e previsível.
 
-### 2b. Manipular `chunks[]` (O DATAMOSH de verdade)
-- **I-frame removal ("melt")**: remover chunks `type==='key'` nos cortes (manter o key do frame 0).
-- **P-frame duplication ("bloom")**: para chunk delta alvo, `splice` inserindo N cópias.
-- **frame drop / reorder em janela / corromper bytes de delta** (intensidade) → variações.
-- Reaplicar timestamps em ordem de decode: `ts = i * 1e6 / fps`.
+### 2b. Manipular `chunks[]` (O DATAMOSH de verdade) — parâmetros validados empiricamente
+
+- **Melt (I-frame removal)** ✅ funciona direto, sem config especial: remover chunks `type==='key'`
+  nos cortes (manter o key do frame 0). Confirmado: decode não erra, pixel pós-corte fica com a
+  cor da cena anterior.
+- **Bloom (P-frame duplication)** ✅ funciona, **MAS requer decoder `hardwareAcceleration:
+  'prefer-hardware'`** (ver 2d). Sem isso, o decoder (software ou "no-preference", que cai em
+  software) **aborta** — Chrome valida `frame_num` no slice header do H.264 e duplicatas idênticas
+  violam a continuidade exigida pelo spec. O decoder de hardware faz *concealment* e tolera.
+  Implementação: para chunk `delta` alvo, `splice` inserindo N cópias (ex.: 20–25), depois
+  **retimestampar sequencialmente** (`ts = i * 1e6/fps` na nova ordem).
+- **Corrupt (corrupção de bytes)** ✅ funciona, **MAS tem teto de densidade**: XOR esparso (a cada
+  ~20 bytes, pulando os 6 primeiros bytes do NAL = header+início do slice header) sobrevive 100% e
+  propaga o glitch visualmente até o próximo keyframe. Stride mais denso (a cada 7 ou 2 bytes) faz
+  o decoder abortar **mesmo em hardware**. → parâmetro de intensidade na UI deve ter um piso de
+  stride seguro (~15–20); abaixo disso, avisar que pode quebrar o decode.
+- **frame drop / reorder em janela**: ainda não testado experimentalmente; tratar como o melt
+  (provavelmente seguro) até validar.
+- Reaplicar timestamps em ordem de decode sempre que a lista de chunks for reordenada/expandida.
 
 ### 2c. MUX (reusa scaffolding do `exportMP4Mediabunny`)
 ```
@@ -91,16 +108,22 @@ output.addVideoTrack(src); await output.start();
 for(const c of chunks) await src.add(new EncodedPacket(c.data, c.type, c.timestamp/1e6, 1/fps));
 await output.finalize(); // → Blob mp4
 ```
-⚠️ Adicionar **em ordem de decode**; primeiro packet deve ser `key`.
+⚠️ Adicionar **em ordem de decode**; primeiro packet deve ser `key`. (Ainda não testado ao vivo —
+testar no Bloco 4/export.)
 
-### 2d. PREVIEW (decode do stream JÁ manipulado)
+### 2d. PREVIEW (decode do stream JÁ manipulado) — config CORRIGIDA pelo teste
 ```
-const dec = new VideoDecoder({ output:f=>{ ctx.drawImage(f,0,0,W,H); f.close(); }, error:()=>{} });
-dec.configure({ codec:"avc1.42001f", codedWidth:W, codedHeight:H });
-for(const c of chunks) dec.decode(new EncodedVideoChunk({type:c.type, timestamp:c.timestamp, data:c.data}));
+const dec = new VideoDecoder({ output:f=>{ ctx.drawImage(f,0,0,W,H); f.close(); }, error:e=>{/* tratar, não é fatal */} });
+dec.configure({
+  codec:"avc1.42001f", codedWidth:W, codedHeight:H,
+  description: decoderDescription,           // capturado do 1º output.metadata.decoderConfig.description do encoder
+  hardwareAcceleration:"prefer-hardware"      // ⚠️ OBRIGATÓRIO p/ bloom e corrupt sobreviverem
+});
+for(const c of chunks) dec.decode(new EncodedVideoChunk({type:c.type, timestamp:c.timestamp, duration:c.duration, data:c.data}));
 ```
-O decoder "errando" nas referências quebradas **é** o efeito. (Precisa do `description`/avcC do encoder;
-guardar o `metadata.decoderConfig.description` do primeiro `output`.)
+O decoder "errando" nas referências quebradas **é** o efeito — confirmado pixel-level no Bloco 1.
+Tratar `error` no decoder como **esperado** com corrupção/bloom agressivos, não como bug: se
+disparar, a UI deve mostrar o último frame bom e sugerir reduzir a intensidade (não travar a tool).
 
 ---
 
@@ -120,7 +143,7 @@ guardar o `metadata.decoderConfig.description` do primeiro `output`.)
 | Bloco | Tempo | Tarefa |
 |---|---|---|
 | **0** | 30min | Criar `dataMoshingTool/index.html` LIMPO (shell mínimo). Portar do Loop Lab só os utils base (timing, seed, helpers, `downloadBlob`). Sem generators/effects |
-| **1 ⚠️** | 2–3h | **PRIMEIRO**: protótipo isolado do núcleo (2a→2d), usando o padrão de teste dev-only. Encode 1 key → derrubar/duplicar/corromper → **decode e ver o smear**. Valida o risco antes de tudo |
+| **1 ⚠️** | ~~2–3h~~ ✅ feito | ~~PRIMEIRO: protótipo isolado do núcleo~~ **CONCLUÍDO 2026-06-19** — rodado de verdade no Chrome (não index.html). Melt/bloom/corrupt confirmados reais, com os parâmetros corretos (ver §2b/2d). Ver `DEVLOG.md`. |
 | **2** | 1–2h | Plugar produtores reais: vídeo enviado (decode-by-seek) + imagem no encoder |
 | **3** | 1–2h | UI: pilha de camadas (compositing+blend, portado) + Painel Mosh: melt / bloom ×N / corrupt / drop% / seed |
 | **4** | 1h | Export: stream manipulado → MP4 (reusa mux) + GIF/PNG-seq do output decodificado |
@@ -131,13 +154,20 @@ guardar o `metadata.decoderConfig.description` do primeiro `output`.)
 
 ---
 
-## 5. Riscos a validar no BLOCO 1 (antes de investir o resto)
+## 5. Riscos do BLOCO 1 — RESULTADO (validado 2026-06-19)
 
-1. `VideoEncoder` baseline emite GOP de 1 key sem B-frames? (esperado com `latencyMode:"realtime"`).
-2. Mediabunny `EncodedVideoPacketSource` aceita packets duplicados/re-timestampados e stream começando em key?
-3. `VideoDecoder` precisa do `decoderConfig.description` (avcC) do encoder — capturar no 1º `output.metadata`.
-4. Se H.264 "limpar" demais o glitch (deblocking/concealment): plano B = caminho MPEG-4 ASP/AVI via
-   `ffmpeg.wasm` (mosh clássico mais sujo). Só se sobrar tempo — H.264 deve bastar.
+1. ✅ **CONFIRMADO**: `VideoEncoder` baseline + `latencyMode:"realtime"` respeita `keyFrame:true`
+   nos frames exatos pedidos (GOP totalmente controlado por nós).
+2. ⏳ **Ainda não testado** (será no Bloco 4/export): Mediabunny `EncodedVideoPacketSource` com
+   packets duplicados/re-timestampados. Testar cedo no Bloco 4.
+3. ✅ **CONFIRMADO**: `VideoDecoder` precisa do `description` (avcC) do encoder — capturado de
+   `meta.decoderConfig.description` no 1º callback de `output` do encoder. Funciona.
+4. ✅ **RESOLVIDO, e não como esperado**: H.264 não limpa o melt (funciona puro). Mas bloom/corrupt
+   exigiam uma config não prevista no plano original: **`hardwareAcceleration:'prefer-hardware'`**
+   no `VideoDecoder` (decoder de software/CPU aborta por validação estrita de `frame_num`; o de
+   hardware faz concealment e revela o glitch real). **Plano B (MPEG-4/ffmpeg.wasm) não foi necessário.**
+5. 🆕 **Novo risco descoberto, já mitigado**: corrupção de bytes tem teto de densidade (stride
+   seguro ~15–20; mais denso aborta o decode mesmo em hardware). Vira parâmetro de UI com piso.
 
 **Regra de ouro:** se o Bloco 1 funcionar (decode mostrar smear real), o resto é montagem
 em volta do núcleo, com mecanismos portados pontualmente.
