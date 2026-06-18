@@ -1,0 +1,15 @@
+# Material de terceiros (referência da cliente) — mantido só localmente
+docs/refs_menkman_glitch-momentum.pdf
+
+# Arquivos temporários de build
+docs/_*.html
+*.tmp
+
+# OS / editor
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Dependências (futuro)
+node_modules/
+.vercel/
