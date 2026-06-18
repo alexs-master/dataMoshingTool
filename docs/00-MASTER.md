@@ -8,13 +8,17 @@
 
 ## ⏱️ STATUS ATUAL  ·  PRÓXIMA AÇÃO
 
-- **Fase:** BUILD em andamento. Bloco 1 (núcleo) **validado e concluído** ✅ — melt/bloom/corrupt
-  confirmados reais via teste ao vivo no Chrome, com os parâmetros corretos (ver §RISCOS abaixo).
+- **Fase:** BUILD em andamento. Bloco 1 (núcleo) ✅ e Bloco 0+2 (`index.html` real, upload+mosh+
+  preview+export) ✅ concluídos — testados de ponta a ponta no navegador, 3 bugs reais corrigidos
+  (ver `DEVLOG.md`/`PROCESSO.md` Fase 11: ingestão de vídeo via Mediabunny em vez de `<video>`,
+  metadata no 1º pacote do export, frames de preview como ImageBitmap).
 - **Prazo de entrega:** SÁBADO 2026-06-20.
 - **Janela de build:** SEXTA 2026-06-19.
-- **➡️ PRÓXIMA AÇÃO ao retomar:** Bloco 0 (criar `index.html` LIMPO, portar utils base) usando a
-  config validada do núcleo → Bloco 2 (plugar produtores reais: upload de vídeo/imagem).
+- **➡️ PRÓXIMA AÇÃO ao retomar:** re-testar o fluxo completo após os 3 fixes (ainda não re-validado
+  de ponta a ponta) → Bloco 3 (UI de camadas/blend) → Bloco 4 (validar export real, baixar e abrir o MP4).
 - **Log de progresso:** ver `DEVLOG.md` (atualizar a cada etapa).
+- **Repositório:** https://github.com/alexs-master/dataMoshingTool — `index.html` ainda não commitado
+  na branch principal nesta sessão; ver PR aberto se houver.
 
 ---
 

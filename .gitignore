@@ -5,6 +5,12 @@ docs/refs_menkman_glitch-momentum.pdf
 docs/_*.html
 *.tmp
 
+# Artefatos de teste/debug local (servidores ad-hoc, inspeção de MP4)
+__debug_test.*
+__mp4_inspect*.py
+__range_server.js
+*.log
+
 # OS / editor
 Thumbs.db
 .DS_Store

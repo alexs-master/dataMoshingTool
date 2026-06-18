@@ -6,6 +6,46 @@
 
 ---
 
+## 2026-06-19 (sex) — Bloco 0+2: `index.html` real construído, testado no navegador, 2 bugs encontrados e corrigidos
+
+- ✅ Criado `index.html` (build limpo, conforme diretriz — não fork do Loop Lab): shell de UI
+  própria (tabs Vídeo/Foto, upload, painel de mosh, preview, export), núcleo de bitstream
+  embutido (encode→melt/bloom/corrupt→mux/decode com os parâmetros validados no Bloco 1),
+  glitch de imagem (pixel sort ASDF + RGB shift).
+- ✅ **Testado de ponta a ponta no navegador de verdade** (Chrome via automação), não só lido.
+  Gerei um vídeo de teste sintético (encode→mux MP4 via WebCodecs/Mediabunny), injetei no input
+  de upload real, e acompanhei o pipeline completo rodar.
+- 🐛 **Bug real #1 encontrado:** a ingestão de vídeo usava `<video>`+seek (decode-by-seek), igual
+  ao Loop Lab. Nesse ambiente de teste, a tag `<video>` nunca disparava `loadedmetadata` para o
+  MP4 gerado (`networkState` preso em LOADING), mesmo com o arquivo estruturalmente válido
+  (confirmado byte a byte: ftyp/moov/mdat corretos, avcC/SPS/PPS corretos) — confirmado depois que
+  o MESMO arquivo decodificava perfeitamente via Mediabunny `Input`+`CanvasSink` (WebCodecs puro).
+  **Correção:** trocada toda a ingestão de vídeo de `<video>`+seek para **Mediabunny demux
+  (`Input`+`CanvasSink.getCanvas(t)`)** — sem depender da tag `<video>`/HTMLMediaElement. Mais
+  consistente com a filosofia WebCodecs-first do projeto, e evita essa classe de problema também
+  para usuários reais (decoder mais permissivo que o pipeline de mídia do browser).
+- 🐛 **Bug real #2 encontrado:** o export MP4 (`EncodedVideoPacketSource.add(packet)`) lançava
+  `"Video chunk metadata must be provided"` no Mediabunny — o primeiro pacote de um track precisa
+  vir com `{decoderConfig:{codec,codedWidth,codedHeight,description}}` como 2º argumento de `add()`.
+  Isso resolve o risco #2 do Bloco 1 que estava pendente ("Mediabunny aceita packets manipulados?
+  ainda não testado"). **Corrigido** no handler de export.
+- 🐛 **Bug real #3 encontrado:** o preview ao vivo travava silenciosamente (sem erro nenhum) ao
+  aplicar o mosh. Causa: os `VideoFrame` decodificados eram empilhados num array sem `.close()`
+  (para depois tocar em loop) — decoders de **hardware** (obrigatório p/ bloom/corrupt, ver Bloco 1)
+  têm um pool pequeno de buffers; acumular frames abertos esgota o pool e o decode trava sem
+  disparar erro. **Corrigido:** cada `VideoFrame` agora é convertido em `ImageBitmap` (leve, sem
+  segurar recurso do decoder) e fechado imediatamente; o array de preview guarda os bitmaps.
+- **Método de debug que valeu a pena registrar:** quando algo trava sem erro nenhum, reproduzir a
+  mesma lógica isolada (sem a estrutura de callbacks do app) com logging explícito em cada etapa
+  revela o ponto exato da diferença. Foi assim que achei o bug #3 — a versão isolada (que fechava
+  frames na hora) funcionava, a do app (que não fechava) travava.
+- Verificado: nenhum arquivo de debug (`__debug_test.mp4`, scripts de inspeção MP4, servidor de
+  range) foi commitado — removidos antes do commit; `.gitignore` atualizado para preveni-los no futuro.
+- ➡️ Próximo: re-testar o fluxo completo após os 3 fixes (ainda não re-validado de ponta a ponta
+  após a última correção); depois Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real).
+
+---
+
 ## 2026-06-19 (sex) — BLOCO 1: núcleo validado (de-risco concluído) ✅
 
 - ✅ Protótipo do núcleo rodado **de verdade** no Chrome (via DevTools/JS, não pseudocódigo):
