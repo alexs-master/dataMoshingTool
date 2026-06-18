@@ -6,6 +6,37 @@
 
 ---
 
+## 2026-06-19 (sex) — Fix: canvas não adaptava ao vídeo + vazamento entre modos Vídeo/Foto
+
+- 🐛 **Reportado pelo usuário, testando a build do PR #1:** (1) canvas do stage não ajustava
+  resolução/proporção à fonte de vídeo; (2) ao trocar de Vídeo→Foto com um vídeo carregado, o
+  vídeo continuava aparecendo por cima da foto; (3) ao voltar de Foto→Vídeo, o vídeo "herdava" a
+  proporção da foto.
+- **Causas-raiz (2, compartilhadas pelos 3 sintomas):**
+  1. A ingestão de vídeo nunca recalculava `project.width/height` a partir da fonte — só a
+     ingestão de foto fazia isso. Por isso o vídeo sempre usava as dimensões padrão (480×270) ou
+     o que sobrasse de um carregamento anterior de foto.
+  2. O loop de animação do preview (`requestAnimationFrame`) nunca era invalidado ao trocar de
+     modo ou carregar um novo arquivo — o `previewLoopToken` só era incrementado dentro do próprio
+     `playPreview`. Como o canvas é compartilhado entre os dois modos, o loop antigo continuava
+     redesenhando frames de vídeo por cima do que quer que o modo Foto desenhasse depois.
+- **Correção:**
+  - Novo helper `fitProjectSize(srcW, srcH, maxDim)` — calcula `project.width/height` a partir da
+    proporção real da fonte; usado igualmente nos dois modos (antes só a foto tinha essa lógica,
+    duplicada inline).
+  - Novo helper `stopPreviewLoop()` (incrementa `previewLoopToken`) chamado no início de
+    `setMode()` e de `handleFile()` — garante que qualquer loop de preview anterior pare antes de
+    trocar de modo ou carregar um arquivo novo.
+- **Verificado no preview do navegador** (não só lido): vídeo sintético 320×180 → canvas
+  480×270 (proporção 1.778 ✓). Troca para Foto com imagem 200×300 → canvas 320×480 (proporção
+  0.667 ✓), pixel central confirmado com a cor real da foto (sem vídeo vazando, pixel idêntico
+  antes/depois de 800ms ocioso). Volta para Vídeo e recarrega → canvas 480×270 de novo (não ficou
+  preso na proporção da foto). Fluxo de aplicar mosh + export re-testado, continua funcionando.
+- ➡️ Próximo: commit no branch do PR #1 (`feat/datamosh-core-mvp`); depois Bloco 3 (UI de
+  camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
 ## 2026-06-19 (sex) — Bloco 0+2: `index.html` real construído, testado no navegador, 2 bugs encontrados e corrigidos
 
 - ✅ Criado `index.html` (build limpo, conforme diretriz — não fork do Loop Lab): shell de UI

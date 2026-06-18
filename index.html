@@ -484,10 +484,26 @@ function setProgress(p){
   fill.style.width = clamp(p,0,1)*100 + "%";
 }
 
+/** Ajusta project.width/height para caber a proporção da fonte (vídeo OU foto)
+ *  dentro de um quadro máximo — mesma lógica para os dois modos. */
+function fitProjectSize(srcW, srcH, maxDim){
+  maxDim = maxDim || 480;
+  const ar = srcW / srcH;
+  project.width = ar >= 1 ? maxDim : Math.round(maxDim * ar);
+  project.height = ar >= 1 ? Math.round(maxDim / ar) : maxDim;
+}
+
+/** Invalida qualquer loop de preview (rAF) em andamento — chamado ao trocar de
+ *  modo ou carregar um novo arquivo, para o frame antigo parar de ser desenhado
+ *  por cima do conteúdo novo (canvas é compartilhado entre os dois modos). */
+let previewLoopToken = 0;
+function stopPreviewLoop(){ previewLoopToken++; }
+
 /* ---------- tabs de modo ---------- */
 $("tabVideo").onclick = () => setMode("video");
 $("tabPhoto").onclick = () => setMode("photo");
 function setMode(m){
+  stopPreviewLoop(); // o canvas é compartilhado entre os dois modos
   mode = m;
   $("tabVideo").classList.toggle("active", m==="video");
   $("tabPhoto").classList.toggle("active", m==="photo");
@@ -527,6 +543,7 @@ $("dropZone").ondrop = (e) => {
 $("fileInput").onchange = (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); };
 
 async function handleFile(file){
+  stopPreviewLoop(); // garante que nenhum preview antigo continue desenhando por cima
   $("dropZone").classList.add("has-file");
   lastMoshResult = null; lastPhotoResult = null;
   $("exportMp4Btn").disabled = true; $("exportPngBtn").disabled = true;
@@ -535,15 +552,16 @@ async function handleFile(file){
     setStatus("Carregando vídeo (demux)…");
     try {
       videoSrc = await loadVideoFile(file);
+      fitProjectSize(videoSrc.width, videoSrc.height);
       $("srcInfo").textContent = `${videoSrc.width}×${videoSrc.height} · ${videoSrc.duration.toFixed(1)}s`;
       $("durRange").max = Math.min(8, Math.max(0.5, videoSrc.duration)).toFixed(1);
       updateFrameCount();
       $("applyBtn").disabled = false;
       setStatus("Vídeo carregado. Ajuste os parâmetros e clique em Aplicar.");
-      // desenha 1 frame de prévia
+      // desenha 1 frame de prévia, já no tamanho/proporção certos
       const previewCanvas = await videoSrc.getFrameCanvas(0);
-      const ctx = $("stage").getContext("2d");
       $("stage").width = project.width; $("stage").height = project.height;
+      const ctx = $("stage").getContext("2d");
       if (previewCanvas) ctx.drawImage(previewCanvas, 0, 0, project.width, project.height);
     } catch(e){
       setStatus("Erro: " + e.message);
@@ -554,9 +572,7 @@ async function handleFile(file){
     try {
       imageBitmap = await createImageBitmap(file);
       $("srcInfo").textContent = `${imageBitmap.width}×${imageBitmap.height}`;
-      const ar = imageBitmap.width / imageBitmap.height;
-      project.width = ar >= 1 ? 480 : Math.round(480*ar);
-      project.height = ar >= 1 ? Math.round(480/ar) : 480;
+      fitProjectSize(imageBitmap.width, imageBitmap.height);
       $("stage").width = project.width; $("stage").height = project.height;
       const ctx = $("stage").getContext("2d");
       ctx.drawImage(imageBitmap, 0, 0, project.width, project.height);
@@ -664,7 +680,6 @@ async function applyVideoMosh(){
   $("applyBtn").disabled = false;
 }
 
-let previewLoopToken = 0;
 async function playPreview(chunks, decoderDescription, w, h, fps){
   const myToken = ++previewLoopToken;
   const canvas = $("stage"); canvas.width = w; canvas.height = h;
