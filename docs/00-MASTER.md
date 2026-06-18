@@ -151,6 +151,7 @@ Pseudocódigo completo em `PLAN.md` §2.
 - `docs/PLAN.md` — plano time-boxed com pseudocódigo do núcleo
 - `docs/RESEARCH.md` — pesquisa de datamoshing + análise de reuso + fontes
 - `docs/DEVLOG.md` — log de progresso (atualizar durante a build)
+- `docs/PROCESSO.md` — documentação NARRATIVA completa do processo (decisões + porquês; ver política de documentação no final dele)
 - (a criar na build) `index.html` — o app
 
 ## 🔗 REFERÊNCIAS RÁPIDAS
@@ -159,5 +160,6 @@ Pseudocódigo completo em `PLAN.md` §2.
 - Mediabunny: https://mediabunny.dev/guide/quick-start
 - WebCodecs muxing: https://webcodecsfundamentals.org/basics/muxing/
 - Datamosh técnica: https://glitchology.com/datamoshing/
-- ⚠️ A bíblia datamoshing.com está OFFLINE (IIS parked). Conteúdo minerado em `BIBLE-datamoshing-com.md`. Recuperar via `https://web.archive.org/web/2021id_/http://datamoshing.com/<artigo>`
+- ℹ️ datamoshing.com está NO AR para a cliente (meu sandbox recebia placeholder IIS). Cópia offline minerada em `BIBLE-datamoshing-com.md`. Backup via `https://web.archive.org/web/2021id_/http://datamoshing.com/<artigo>`
+- Repositório do projeto (GitHub, público): https://github.com/alexs-master/dataMoshingTool
 - ASDF Pixel Sort (ref. de pixel sort da bíblia): GitHub `kimasendorf/ASDFPixelSort`

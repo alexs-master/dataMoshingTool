@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-06-18 (qui) — Política de documentação total + PROCESSO.md
+
+- ⚠️ **Diretriz permanente do usuário:** "todo o processo deve ser documentado. Tudo." Vale daqui
+  pra frente, não só para o planejamento já feito.
+- ✅ Criado `PROCESSO.md`: documentação NARRATIVA completa (linha do tempo por fases, decisões-chave
+  com o porquê, índice de artefatos) — complementa o `DEVLOG.md` (log curto) e o `00-MASTER.md`
+  (snapshot de estado). Cobre da Fase 0 (origem) até a Fase 9 (git/GitHub).
+- Política registrada no fim do `PROCESSO.md`: toda etapa relevante → `DEVLOG.md` + (quando muda o
+  raciocínio/contexto) expandida no `PROCESSO.md`; decisões sempre com o porquê; manter ambos em dia.
+- `00-MASTER.md` atualizado: índice inclui `PROCESSO.md`; corrigida nota antiga "datamoshing.com
+  OFFLINE" (já havia sido corrigida no BIBLE, faltava aqui); link do repositório GitHub adicionado.
+- ➡️ Próximo: SEXTA (B0+B1). Cada bloco da build deve gerar entrada no DEVLOG (e no PROCESSO se houver
+  decisão/raciocínio relevante) + commit/push.
+
+---
+
+## 2026-06-18 (qui) — Git + GitHub (para sessões na nuvem com PC desligado)
+
+- ✅ Repositório git inicializado (branch `main`); 1º commit com toda a pasta `docs/`.
+  `.gitignore` exclui o PDF de terceiros (Menkman) e temporários de build (`docs/_*.html`).
+- ✅ `gh` CLI instalado **portátil** (sem admin) em `C:\Users\nicho\gh\bin\gh.exe` (v2.94.0)
+  — winget falhou por UAC recusado (exit 1602), então baixei o zip oficial.
+- ✅ Autenticado na **conta nova** `alexs-master` (escopo `repo`); `gh auth setup-git` feito.
+- ✅ Repositório **PÚBLICO** criado e com push: **https://github.com/alexs-master/dataMoshingTool**
+- **Motivo:** permitir abrir uma **sessão na nuvem** (claude.ai/code ou app) com o PC desligado,
+  já que o Remote Control só funciona com o PC ligado/acordado.
+- ➡️ Próximo: build de SEXTA inalterado (B0+B1). Lembrar de **commitar/pushar** o progresso da build.
+
+---
+
 ## 2026-06-18 (qui) — Resumo para a cliente (técnico + PDF)
 
 - ✅ `RESUMO-PARA-CLIENTE.md` — cliente entende técnica, então versão COM jargão: filosofia
