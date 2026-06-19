@@ -6,6 +6,33 @@
 
 ---
 
+## 2026-06-19 (sex) — Redesenho do trim: dropdown de duração + região arrastável na timeline
+
+- 🔁 **Pedido do usuário, revisando a 1ª versão do slider de trim:** o limite do loop volta a ser
+  um **dropdown** (não slider livre), e a região escolhida deve aparecer destacada numa **barra
+  de timeline**, arrastável **inteira** (clicar na região e mover, não redimensionar por alças).
+- Removido o trim de duas alças (`<input type=range>` sobrepostos) da iteração anterior.
+  Substituído por:
+  - `<select id="durSelect">` com presets fixos (1/2/3/4/5/6/8s) — define a LARGURA da janela.
+  - `#timelineBar` / `#timelineRegion`: barra representando o vídeo inteiro, com a região
+    destacada (largura proporcional à duração escolhida) arrastável via **Pointer Events**
+    (`pointerdown`/`pointermove`/`pointerup` + `setPointerCapture`, funciona com mouse e touch).
+  - `regionOffset` (estado) substitui os antigos `regionStart`/`regionEnd` independentes — agora
+    é só o início da janela; o fim é sempre `regionOffset + project.duration`.
+- Mantido da iteração anterior: preview ao vivo do frame sob a região durante o arraste/troca de
+  duração (`showRegionPreviewFrame`), e o `fileLoadToken` que corrige a race condition de troca
+  rápida de arquivo.
+- **Verificado no preview do navegador** com vídeo de teste de 10s (bandas de cor a cada 2,5s):
+  - Trocar duração no dropdown (3s→5s): região passa de 30% para 50% de largura, frameCount
+    120 ✓.
+  - Arrastar a região (offset 0→3s): `"3.0s – 8.0s"`, largura mantida em 50% ✓.
+  - Arrastar além do fim do vídeo: trava em `"5.0s – 10.0s"` (não deixa passar) ✓.
+  - Aplicar mosh na região 5–10s: pixel central do resultado decodificado bate com a banda verde
+    esperada (~rgb(16,128,64), banda 5–7,5s), confirmando que usa a região certa, não o início ✓.
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
 ## 2026-06-19 (sex) — Slider de região (trim) do vídeo
 
 - ✅ **Pedido do usuário:** precisa dar pra escolher QUAL trecho do vídeo enviado é usado, não
