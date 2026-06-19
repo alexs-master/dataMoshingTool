@@ -28,6 +28,18 @@ label.field{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:va
 label.field .val{color:var(--acc2);font-weight:600}
 label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt);margin-bottom:6px;cursor:pointer}
 
+/* trim-slider: duas alças (in/out) sobre uma única faixa, técnica de 2 <input type=range> empilhados */
+.trim-slider{position:relative;height:26px;margin:4px 0 2px}
+.trim-track{position:absolute;top:11px;left:0;right:0;height:4px;background:#1a1a1f;border-radius:2px}
+.trim-fill{position:absolute;top:11px;height:4px;background:var(--acc);border-radius:2px;pointer-events:none}
+.trim-slider input[type=range]{position:absolute;top:0;left:0;width:100%;height:26px;margin:0;background:transparent;pointer-events:none;-webkit-appearance:none;appearance:none}
+.trim-slider input[type=range]::-webkit-slider-runnable-track{background:transparent;height:26px}
+.trim-slider input[type=range]::-moz-range-track{background:transparent;height:26px}
+.trim-slider input[type=range]::-webkit-slider-thumb{pointer-events:all;-webkit-appearance:none;appearance:none;width:11px;height:18px;border-radius:3px;background:var(--acc);border:1px solid #000;cursor:ew-resize;margin-top:4px}
+.trim-slider input[type=range]::-moz-range-thumb{pointer-events:all;width:11px;height:18px;border-radius:3px;background:var(--acc);border:1px solid #000;cursor:ew-resize}
+.trim-slider input#regionStart{z-index:3}
+.trim-slider input#regionEnd{z-index:4}
+
 #topbar{display:flex;align-items:center;gap:14px;padding:9px 14px;background:#101013;border-bottom:1px solid var(--line);flex-wrap:wrap}
 #logo{font-weight:800;font-size:13px;letter-spacing:.03em}
 #logo .dot{color:var(--acc)}
@@ -97,9 +109,14 @@ a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
 
     <div class="section" id="videoTimeSection">
       <h2>Tempo / Saída</h2>
-      <label class="field">Duração a usar (s) <span class="val" id="durVal">3.0</span>
-        <input type="range" id="durRange" min="0.5" max="8" step="0.1" value="3">
-      </label>
+      <label class="field">Região do vídeo <span class="val" id="regionVal">0.0s – 3.0s (3.0s)</span></label>
+      <div class="trim-slider">
+        <div class="trim-track"></div>
+        <div class="trim-fill" id="trimFill"></div>
+        <input type="range" id="regionStart" min="0" max="3" step="0.1" value="0">
+        <input type="range" id="regionEnd" min="0" max="3" step="0.1" value="3">
+      </div>
+      <div class="hint">Arraste as alças para escolher o trecho do vídeo a moshar (máx. 8s).</div>
       <label class="field">FPS <span class="val" id="fpsVal">24</span>
         <input type="range" id="fpsRange" min="12" max="30" step="1" value="24">
       </label>
@@ -542,7 +559,9 @@ $("dropZone").ondrop = (e) => {
 };
 $("fileInput").onchange = (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); };
 
+let fileLoadToken = 0; // descarta cargas antigas se o usuário trocar de arquivo antes da anterior terminar
 async function handleFile(file){
+  const myFileToken = ++fileLoadToken;
   stopPreviewLoop(); // garante que nenhum preview antigo continue desenhando por cima
   $("dropZone").classList.add("has-file");
   lastMoshResult = null; lastPhotoResult = null;
@@ -551,26 +570,34 @@ async function handleFile(file){
     videoFile = file;
     setStatus("Carregando vídeo (demux)…");
     try {
-      videoSrc = await loadVideoFile(file);
+      const loaded = await loadVideoFile(file);
+      if (myFileToken !== fileLoadToken) return; // uma carga mais nova já começou
+      videoSrc = loaded;
       fitProjectSize(videoSrc.width, videoSrc.height);
       $("srcInfo").textContent = `${videoSrc.width}×${videoSrc.height} · ${videoSrc.duration.toFixed(1)}s`;
-      $("durRange").max = Math.min(8, Math.max(0.5, videoSrc.duration)).toFixed(1);
-      updateFrameCount();
+      $("regionStart").max = videoSrc.duration.toFixed(1);
+      $("regionEnd").max = videoSrc.duration.toFixed(1);
+      $("regionStart").value = 0;
+      $("regionEnd").value = Math.min(3, videoSrc.duration).toFixed(1);
+      updateRegionUI();
       $("applyBtn").disabled = false;
       setStatus("Vídeo carregado. Ajuste os parâmetros e clique em Aplicar.");
       // desenha 1 frame de prévia, já no tamanho/proporção certos
       const previewCanvas = await videoSrc.getFrameCanvas(0);
+      if (myFileToken !== fileLoadToken) return;
       $("stage").width = project.width; $("stage").height = project.height;
       const ctx = $("stage").getContext("2d");
       if (previewCanvas) ctx.drawImage(previewCanvas, 0, 0, project.width, project.height);
     } catch(e){
-      setStatus("Erro: " + e.message);
+      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
     }
   } else {
     imageFile = file;
     setStatus("Carregando imagem…");
     try {
-      imageBitmap = await createImageBitmap(file);
+      const loaded = await createImageBitmap(file);
+      if (myFileToken !== fileLoadToken) return;
+      imageBitmap = loaded;
       $("srcInfo").textContent = `${imageBitmap.width}×${imageBitmap.height}`;
       fitProjectSize(imageBitmap.width, imageBitmap.height);
       $("stage").width = project.width; $("stage").height = project.height;
@@ -579,18 +606,70 @@ async function handleFile(file){
       $("applyBtn").disabled = false;
       setStatus("Imagem carregada. Ajuste os parâmetros e clique em Aplicar.");
     } catch(e){
-      setStatus("Erro: " + e.message);
+      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
     }
   }
 }
 
-/* ---------- controles: tempo/saída ---------- */
-$("durRange").oninput = () => { project.duration = +$("durRange").value; $("durVal").textContent = project.duration.toFixed(1); updateFrameCount(); };
+/* ---------- controles: tempo/saída (trim de região do vídeo) ---------- */
+const REGION_MAX_LEN = 8;   // teto de duração do trecho selecionável (s)
+const REGION_MIN_GAP = 0.2; // distância mínima entre as alças (s)
+
+function updateRegionUI(){
+  let start = +$("regionStart").value;
+  let end = +$("regionEnd").value;
+  const srcMax = +$("regionEnd").max || REGION_MAX_LEN;
+
+  if (end - start < REGION_MIN_GAP) end = Math.min(srcMax, start + REGION_MIN_GAP);
+  if (end - start > REGION_MAX_LEN) start = Math.max(0, end - REGION_MAX_LEN);
+  $("regionStart").value = start; $("regionEnd").value = end;
+
+  project.duration = end - start;
+  $("regionVal").textContent = `${start.toFixed(1)}s – ${end.toFixed(1)}s (${project.duration.toFixed(1)}s)`;
+
+  const pStart = srcMax > 0 ? (start/srcMax)*100 : 0;
+  const pEnd = srcMax > 0 ? (end/srcMax)*100 : 100;
+  const fill = $("trimFill");
+  fill.style.left = pStart + "%";
+  fill.style.width = (pEnd - pStart) + "%";
+
+  updateFrameCount();
+  return { start, end };
+}
+
+/* mostra no canvas o frame exato sob a alça que está sendo arrastada — sem isso o
+   slider fica "cego" (usuário não vê o que está escolhendo até clicar Aplicar). */
+let regionPreviewSeq = 0;
+async function showRegionPreviewFrame(t){
+  if (!videoSrc || mode !== "video") return;
+  stopPreviewLoop(); // não deixa um preview de mosh já tocando sobrescrever a prévia do scrub
+  const seq = ++regionPreviewSeq;
+  const frameCanvas = await videoSrc.getFrameCanvas(Math.min(Math.max(0,t), videoSrc.duration - 0.001));
+  if (seq !== regionPreviewSeq || !frameCanvas) return; // resposta antiga/sem frame, descarta
+  const c = $("stage");
+  c.width = project.width; c.height = project.height;
+  c.getContext("2d").drawImage(frameCanvas, 0, 0, c.width, c.height);
+}
+
+$("regionStart").oninput = () => {
+  // arrastar o início além do teto de duração empurra o início (mantém o fim fixo)
+  let start = +$("regionStart").value, end = +$("regionEnd").value;
+  if (end - start > REGION_MAX_LEN) $("regionStart").value = end - REGION_MAX_LEN;
+  const r = updateRegionUI();
+  showRegionPreviewFrame(r.start);
+};
+$("regionEnd").oninput = () => {
+  // arrastar o fim além do teto de duração empurra o fim (mantém o início fixo)
+  let start = +$("regionStart").value, end = +$("regionEnd").value;
+  if (end - start > REGION_MAX_LEN) $("regionEnd").value = start + REGION_MAX_LEN;
+  const r = updateRegionUI();
+  showRegionPreviewFrame(Math.max(0, r.end - 0.001));
+};
 $("fpsRange").oninput = () => { project.fps = +$("fpsRange").value; $("fpsVal").textContent = project.fps; updateFrameCount(); };
 function updateFrameCount(){
   $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
 }
-updateFrameCount();
+updateRegionUI();
 
 /* ---------- controles: mosh de vídeo ---------- */
 const bindRange = (id, valId, fmt) => {
@@ -624,6 +703,7 @@ async function applyVideoMosh(){
   const W = project.width, H = project.height;
   const seed = +$("seedInput").value || 1;
   const rng = mulberry32(hashInt(seed));
+  const regionStart = +$("regionStart").value, regionEnd = +$("regionEnd").value;
 
   // corte de melt
   let cutIdx;
@@ -638,8 +718,8 @@ async function applyVideoMosh(){
 
   try {
     const drawFrame = async (i, ctx, w, h) => {
-      const t = (i / Math.max(1,total-1)) * Math.min(project.duration, videoSrc.duration);
-      const frameCanvas = await videoSrc.getFrameCanvas(t);
+      const t = regionStart + (i / Math.max(1,total-1)) * (regionEnd - regionStart);
+      const frameCanvas = await videoSrc.getFrameCanvas(Math.min(t, videoSrc.duration - 0.001));
       ctx.clearRect(0,0,w,h);
       if (frameCanvas) ctx.drawImage(frameCanvas, 0, 0, w, h);
     };

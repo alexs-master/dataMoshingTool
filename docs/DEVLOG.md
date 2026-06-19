@@ -6,6 +6,34 @@
 
 ---
 
+## 2026-06-19 (sex) — Slider de região (trim) do vídeo
+
+- ✅ **Pedido do usuário:** precisa dar pra escolher QUAL trecho do vídeo enviado é usado, não
+  sempre o início. Antes, a "Duração a usar" só definia quantos segundos a partir de t=0.
+- Implementado um **trim-slider de duas alças** (técnica clássica de dois `<input type=range>`
+  sobrepostos, com `pointer-events:none` no input e `pointer-events:all` só no thumb) — substitui
+  o antigo slider único de duração. Mostra início/fim/duração (`0.0s – 3.0s (3.0s)`), barra de
+  preenchimento visual entre as alças, e teto de 8s para o trecho selecionável (igual ao limite
+  antigo, agora aplicado à LARGURA da região, não mais fixo a partir de t=0).
+- **Bônus de UX:** a alça que está sendo arrastada atualiza o canvas com o frame exato sob ela —
+  sem isso o slider ficaria "cego" (só veria o resultado depois de clicar Aplicar).
+- `applyVideoMosh` (`drawFrame`) agora amostra a partir de `regionStart`, não de 0 — confirmado por
+  pixel: aplicando numa região 4–7s de um vídeo de teste com bandas de cor por trecho de tempo, o
+  resultado decodificado mostrou a cor da banda 4–7s (laranja), não a do início (azul).
+- 🐛 **Bug encontrado e corrigido durante o teste (não relacionado ao slider em si):** ao disparar
+  carregamentos de arquivo em sequência rápida (sem esperar o anterior terminar — foi assim que
+  achei, testando rápido demais), `handleFile` tinha uma race condition real: a Promise mais lenta
+  de uma carga antiga podia resolver DEPOIS de uma carga mais nova e sobrescrever o estado (causou
+  valores bizarros tipo `max="105.0"` numa repetição do teste). **Corrigido** com um
+  `fileLoadToken` (mesmo padrão do `previewLoopToken`/`stopPreviewLoop` já usado no preview):
+  cargas obsoletas se auto-descartam ao perceber que uma carga mais nova já começou.
+- **Verificado no preview do navegador**, sempre aguardando cada operação assíncrona terminar
+  antes da próxima (a 1ª rodada de teste, sem aguardar, expôs o bug da race condition acima —
+  ensina a sempre serializar os passos ao testar fluxos assíncronos manualmente).
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
 ## 2026-06-19 (sex) — Fix: canvas não adaptava ao vídeo + vazamento entre modos Vídeo/Foto
 
 - 🐛 **Reportado pelo usuário, testando a build do PR #1:** (1) canvas do stage não ajustava
