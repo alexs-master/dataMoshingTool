@@ -136,6 +136,7 @@ a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
       <div id="progressTrack"><div id="progressFill"></div></div>
     </div>
     <div id="exportRow">
+      <button id="playPauseBtn" class="ghost" disabled style="flex:0 0 auto">▶</button>
       <button id="applyBtn" class="primary" disabled>Aplicar datamosh</button>
       <button id="exportMp4Btn" disabled>Exportar MP4</button>
       <button id="exportPngBtn" class="hidden">Exportar PNG</button>
@@ -496,6 +497,8 @@ let imageFile = null, imageBitmap = null;
 let lastMoshResult = null;   // { chunks, decoderDescription, width, height, fps }
 let lastPhotoResult = null;  // canvas with the glitched image
 let regionOffset = 0;        // início do trecho usado, em segundos a partir do começo do vídeo
+let cachedEncode = null;     // { chunks, decoderDescription, width, height, fps, cutIdx, total, sig } — etapa lenta cacheada
+let previewPlaying = true;   // estado do play/pause, preservado entre reaplicações de mosh
 
 function setStatus(text){ $("statusText").textContent = text; }
 function setProgress(p){
@@ -540,6 +543,8 @@ function setMode(m){
   $("dropZone").classList.remove("has-file");
   $("applyBtn").disabled = true;
   $("exportMp4Btn").disabled = true;
+  $("playPauseBtn").disabled = true;
+  $("playPauseBtn").classList.toggle("hidden", m!=="video");
   setStatus("Pronto.");
   drawPlaceholder();
 }
@@ -577,6 +582,7 @@ async function handleFile(file){
       const loaded = await loadVideoFile(file);
       if (myFileToken !== fileLoadToken) return; // uma carga mais nova já começou
       videoSrc = loaded;
+      cachedEncode = null; // vídeo novo — invalida qualquer encode em cache do vídeo anterior
       fitProjectSize(videoSrc.width, videoSrc.height);
       $("srcInfo").textContent = `${videoSrc.width}×${videoSrc.height} · ${videoSrc.duration.toFixed(1)}s`;
       regionOffset = 0;
@@ -649,9 +655,12 @@ $("durSelect").onchange = () => {
   project.duration = +$("durSelect").value;
   updateTimelineUI();
   showRegionPreviewFrame(regionOffset);
+  scheduleAutoApply(); // muda a janela -> precisa recodificar; dispara uma vez só
 };
 
-/* arrastar a região destacada inteira (não alças individuais) para reposicionar o trecho */
+/* arrastar a região destacada inteira (não alças individuais) para reposicionar o trecho.
+   Durante o arraste só atualiza a prévia leve (frame cru, sem mosh) — re-encodar a cada
+   pixel de movimento seria pesado demais. O encode+mosh completo roda ao SOLTAR. */
 (() => {
   const region = $("timelineRegion"), bar = $("timelineBar");
   let dragging = false, startX = 0, startOffset = 0;
@@ -668,7 +677,7 @@ $("durSelect").onchange = () => {
     updateTimelineUI();
     showRegionPreviewFrame(regionOffset);
   });
-  const endDrag = () => { dragging = false; };
+  const endDrag = () => { if (dragging) scheduleAutoApply(); dragging = false; };
   region.addEventListener("pointerup", endDrag);
   region.addEventListener("pointercancel", endDrag);
 })();
@@ -679,21 +688,35 @@ function updateFrameCount(){
 }
 updateTimelineUI();
 
-/* ---------- controles: mosh de vídeo ---------- */
-const bindRange = (id, valId, fmt) => {
+/* ---------- controles: mosh de vídeo + glitch de foto (ambos reaplicam ao vivo, com debounce) ---------- */
+const bindRange = (id, valId, fmt, onChange) => {
   const el = $(id), out = $(valId);
-  el.oninput = () => out.textContent = fmt ? fmt(+el.value) : el.value;
+  el.oninput = () => { out.textContent = fmt ? fmt(+el.value) : el.value; if (onChange) onChange(); };
 };
-bindRange("bloomTarget","bloomTargetVal");
-bindRange("bloomCount","bloomCountVal");
-bindRange("corruptCount","corruptCountVal");
-bindRange("corruptIntensity","corruptIntensityVal");
-bindRange("sortMin","sortMinVal");
-bindRange("sortMax","sortMaxVal");
-bindRange("rgbAngle","rgbAngleVal");
-bindRange("rgbAmount","rgbAmountVal");
 
-$("randSeedBtn").onclick = () => { $("seedInput").value = Math.floor(Math.random()*99999); };
+/* glitch de foto: pixel-level, sem encode/decode — já é rápido o bastante pra ser ao vivo de verdade */
+let photoAutoApplyTimer = null;
+function schedulePhotoAutoApply(){
+  if (!imageBitmap || mode !== "photo") return;
+  clearTimeout(photoAutoApplyTimer);
+  photoAutoApplyTimer = setTimeout(() => applyPhotoGlitch(), 80);
+}
+
+bindRange("bloomTarget","bloomTargetVal", null, scheduleAutoApply);
+bindRange("bloomCount","bloomCountVal", null, scheduleAutoApply);
+bindRange("corruptCount","corruptCountVal", null, scheduleAutoApply);
+bindRange("corruptIntensity","corruptIntensityVal", null, scheduleAutoApply);
+bindRange("sortMin","sortMinVal", null, schedulePhotoAutoApply);
+bindRange("sortMax","sortMaxVal", null, schedulePhotoAutoApply);
+bindRange("rgbAngle","rgbAngleVal", null, schedulePhotoAutoApply);
+bindRange("rgbAmount","rgbAmountVal", null, schedulePhotoAutoApply);
+
+for (const id of ["meltEnabled","bloomEnabled","corruptEnabled"]) $(id).onchange = scheduleAutoApply;
+$("meltCuts").oninput = scheduleAutoApply;
+$("seedInput").oninput = scheduleAutoApply;
+for (const id of ["sortEnabled","rgbEnabled","sortDir","sortCriterion"]) $(id).onchange = schedulePhotoAutoApply;
+
+$("randSeedBtn").onclick = () => { $("seedInput").value = Math.floor(Math.random()*99999); scheduleAutoApply(); };
 
 /* ---------- aplicar ---------- */
 $("applyBtn").onclick = async () => {
@@ -701,37 +724,57 @@ $("applyBtn").onclick = async () => {
   else applyPhotoGlitch();
 };
 
+$("playPauseBtn").onclick = () => {
+  previewPlaying = !previewPlaying;
+  $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
+};
+
+/* ---------- cache do encode (a etapa LENTA — só refeita se região/resolução/cortes mudarem) ---------- */
+
+function computeCutIdx(total){
+  const cutsRaw = $("meltCuts").value.trim();
+  if (cutsRaw === "auto" || !cutsRaw) return Math.floor(total/2);
+  return clamp(parseInt(cutsRaw.split(",")[0],10) || Math.floor(total/2), 1, total-1);
+}
+function encodeSignature(total, cutIdx){
+  return [regionOffset.toFixed(2), project.duration, project.fps, project.width, project.height, cutIdx, total].join("|");
+}
+
+async function ensureEncoded(){
+  const fps = project.fps;
+  const total = Math.max(1, Math.round(project.duration * fps));
+  const cutIdx = computeCutIdx(total);
+  const sig = encodeSignature(total, cutIdx);
+  if (cachedEncode && cachedEncode.sig === sig) return cachedEncode;
+
+  setStatus("Codificando frames…"); setProgress(0);
+  const W = project.width, H = project.height;
+  const regionStart = regionOffset, regionEnd = regionOffset + project.duration;
+  const keySet = new Set([0, cutIdx]); // sempre codifica o corte como keyframe; melt decide na hora de usar ou não
+
+  const drawFrame = async (i, ctx, w, h) => {
+    const t = regionStart + (i / Math.max(1,total-1)) * (regionEnd - regionStart);
+    const frameCanvas = await videoSrc.getFrameCanvas(Math.min(t, videoSrc.duration - 0.001));
+    ctx.clearRect(0,0,w,h);
+    if (frameCanvas) ctx.drawImage(frameCanvas, 0, 0, w, h);
+  };
+  const { chunks, decoderDescription, width, height } = await encodeFrames(total, fps, W, H, drawFrame, keySet, setProgress);
+  cachedEncode = { chunks, decoderDescription, width, height, fps, cutIdx, total, sig };
+  return cachedEncode;
+}
+
+/* ---------- aplicar mosh (RÁPIDO — só manipula/decodifica os chunks já codificados) ---------- */
 async function applyVideoMosh(){
   if (!videoSrc) return;
   $("applyBtn").disabled = true; $("exportMp4Btn").disabled = true;
-  setStatus("Codificando frames…"); setProgress(0);
+  setProgress(0);
 
-  const fps = project.fps;
-  const total = Math.max(1, Math.round(project.duration * fps));
-  const W = project.width, H = project.height;
   const seed = +$("seedInput").value || 1;
   const rng = mulberry32(hashInt(seed));
-  const regionStart = regionOffset, regionEnd = regionOffset + project.duration;
-
-  // corte de melt
-  let cutIdx;
-  const cutsRaw = $("meltCuts").value.trim();
-  if (cutsRaw === "auto" || !cutsRaw){
-    cutIdx = Math.floor(total/2);
-  } else {
-    cutIdx = clamp(parseInt(cutsRaw.split(",")[0],10) || Math.floor(total/2), 1, total-1);
-  }
-  const keySet = new Set([0]);
-  if ($("meltEnabled").checked) keySet.add(cutIdx);
 
   try {
-    const drawFrame = async (i, ctx, w, h) => {
-      const t = regionStart + (i / Math.max(1,total-1)) * (regionEnd - regionStart);
-      const frameCanvas = await videoSrc.getFrameCanvas(Math.min(t, videoSrc.duration - 0.001));
-      ctx.clearRect(0,0,w,h);
-      if (frameCanvas) ctx.drawImage(frameCanvas, 0, 0, w, h);
-    };
-    const { chunks, decoderDescription, width, height } = await encodeFrames(total, fps, W, H, drawFrame, keySet, setProgress);
+    const enc = await ensureEncoded();
+    const { chunks, decoderDescription, width, height, fps, cutIdx, total } = enc;
 
     let working = chunks;
     let decoderNote = "";
@@ -759,6 +802,8 @@ async function applyVideoMosh(){
     await playPreview(working, decoderDescription, width, height, fps);
 
     $("exportMp4Btn").disabled = false;
+    $("playPauseBtn").disabled = false;
+    $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
     setStatus(`Pronto — ${total} frames, ${working.length} chunks no stream.`);
     setProgress(null);
   } catch(e){
@@ -766,6 +811,16 @@ async function applyVideoMosh(){
     setProgress(null);
   }
   $("applyBtn").disabled = false;
+}
+
+/* reaplica automaticamente (com debounce) quando um parâmetro de mosh muda — só a parte
+   RÁPIDA roda de novo (o encode fica em cache); dá a sensação de "tempo real" possível
+   dentro da técnica real de datamosh (que exige decode, não é um filtro instantâneo). */
+let autoApplyTimer = null;
+function scheduleAutoApply(){
+  if (!videoSrc || mode !== "video") return;
+  clearTimeout(autoApplyTimer);
+  autoApplyTimer = setTimeout(() => applyVideoMosh(), 250);
 }
 
 async function playPreview(chunks, decoderDescription, w, h, fps){
@@ -801,8 +856,10 @@ async function playPreview(chunks, decoderDescription, w, h, fps){
   let i = 0;
   function loop(){
     if (myToken !== previewLoopToken){ frames.forEach(f=>{ try{f.close();}catch(e){} }); return; }
-    ctx.drawImage(frames[i], 0, 0, w, h);
-    i = (i + 1) % frames.length;
+    if (previewPlaying){
+      ctx.drawImage(frames[i], 0, 0, w, h);
+      i = (i + 1) % frames.length;
+    }
     setTimeout(() => requestAnimationFrame(loop), 1000/fps);
   }
   loop();

@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-06-19 (sex) — Play/Pause + preview "ao vivo" (encode em cache, mosh reaplica sozinho)
+
+- 🔁 **Pergunta do usuário:** por que não tem play/pause, e por que os efeitos não são aplicados
+  em tempo real?
+- **Play/Pause**: era só uma funcionalidade que faltava expor — o mecanismo (`previewLoopToken`)
+  já existia. Adicionado botão (`▶`/`⏸`), estado `previewPlaying` lido a cada frame do loop de
+  preview; **preservado entre reaplicações** (se você pausar e depois mudar um parâmetro, o
+  resultado novo aparece já pausado, não retoma sozinho).
+- **"Tempo real" dos efeitos — explicado e parcialmente resolvido:** datamosh real não é um filtro
+  instantâneo (shader) — exige encode H.264 + manipulação de bytes + decode, que leva segundos.
+  Não dá pra reagir a cada tick de um slider sendo arrastado. MAS: só o **encode** é lento, e ele
+  só precisa mudar se região/resolução/FPS/cortes de melt mudarem. Bloom, corrupt e seed atuam
+  **sobre os chunks já codificados** — são rápidos.
+- **Refatoração:** `applyVideoMosh` virou duas partes — `ensureEncoded()` (lento, cacheado por
+  assinatura de região+resolução+fps+corte; só roda nova vez se algo disso mudar) e a manipulação
+  de mosh + decode (rápida, sempre roda de novo). Cache invalidado ao carregar um vídeo novo
+  (`cachedEncode = null` em `handleFile`, senão um vídeo novo podia reusar chunks do anterior).
+- **Auto-reaplicar (debounce):** mudar qualquer checkbox/slider/seed de mosh (vídeo) ou de glitch
+  (foto) dispara o reprocessamento sozinho — sem precisar clicar "Aplicar" de novo. Vídeo usa
+  debounce de 250ms; foto (sem encode/decode, puro `ImageData`) usa 80ms. Arrastar a região na
+  timeline só atualiza a prévia leve (frame cru) durante o arraste — o reencode completo roda
+  uma vez só, ao **soltar**.
+- **Medido no preview do navegador:** 1º apply de um vídeo de 3s/72 frames = ~4000ms (encode
+  completo). Ativar bloom depois (sem clicar Aplicar) = **453ms** até "Pronto" — quase 9x mais
+  rápido, porque reusa o encode em cache. Foto: glitch reaplicado automaticamente ao mudar
+  intensidade do RGB shift, sem clique nenhum.
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
 ## 2026-06-19 (sex) — Redesenho do trim: dropdown de duração + região arrastável na timeline
 
 - 🔁 **Pedido do usuário, revisando a 1ª versão do slider de trim:** o limite do loop volta a ser
