@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-06-20 (sáb) — Amplia limite de repetições do Smear
+
+- A pedido do usuário, o slider **Repetições** do Smear passou de máximo 60 para **300**.
+- O algoritmo não possuía clamp interno; o único limite era o atributo `max` da interface.
+  Em 30 fps, 300 repetições permitem aproximadamente 10 segundos adicionais de smear.
+
+---
+
 ## 2026-06-20 (sáb) — Corrige pixel-fx invisível acima de bitstream + blend ignorado
 
 - **Bug reproduzido pela pilha enviada pelo usuário:** `Databend → Slice hdr → Vídeo`. O Databend
