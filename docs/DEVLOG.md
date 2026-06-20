@@ -6,6 +6,35 @@
 
 ---
 
+## 2026-06-20 (sáb) — Reimplementa efeitos slice-level com parser H.264 estrutural
+
+- Após o diagnóstico de que Slice drop, Slice hdr e MBlock swap faziam XOR/drop cego, o usuário
+  pediu a correção. A implementação anterior tratava offsets de bytes como se campos Exp-Golomb
+  tivessem posição fixa, editava EBSP sem remover emulation-prevention e podia corromper NALs
+  posteriores; o texto “GPU fraca” foi removido por ser um diagnóstico incorreto.
+- **Infraestrutura nova:** parser de `avcC`, SPS e PPS; leitor bit-a-bit de Exp-Golomb; conversão
+  EBSP↔RBSP; parser de slice header baseline/CAVLC; reconstrução de `rbsp_trailing_bits`; atualização
+  correta dos length-prefixes AVCC e suporte preservado a Annex-B.
+- **Slice drop:** quando existem vários slices, remove alguns mas nunca todos. Como WebCodecs costuma
+  gerar um único slice por frame, nesse caso remove o chunk inteiro e retimestampa o stream — não
+  entrega mais um `EncodedVideoChunk` vazio/malformado ao decoder.
+- **Slice hdr:** deixou de XORar os seis primeiros bytes. Agora reescreve POC (largura fixa) e
+  `slice_qp_delta` (Exp-Golomb recodificado), deslocando `slice_data` e reinserindo emulation-prevention
+  corretamente. `first_mb_in_slice`, `slice_type`, PPS e demais campos estruturais são preservados.
+- **MBlock swap:** deixou de usar `hdrOffset+12` e XOR denso até o final do chunk. Mantém o header
+  atual e troca apenas o `slice_data` completo por payload CAVLC de um P-frame compatível, usando o
+  limite real retornado pelo parser. O parâmetro intensidade controla a distância temporal do donor.
+- O pipeline agora passa `decoderDescription` aos efeitos e falha com mensagem específica caso
+  SPS/PPS não possam ser lidos. Hints da interface descrevem o comportamento real.
+- **Teste estrutural automatizado:** fixture H.264 baseline com avcC+SPS+PPS+12 slices AVCC reais.
+  Resultado: Slice drop removeu 3/3 frames single-slice; Slice hdr reescreveu 3/3 headers; MBlock
+  trocou 3/3 payloads; todos os NALs resultantes mantiveram length-prefix válido e foram novamente
+  parseados, zero skips. `node --check` também passou. O decode WebCodecs automatizado não pôde ser
+  executado porque o sandbox Windows bloqueou tanto a aba integrada quanto Chromes temporários;
+  essa limitação de teste foi registrada sem voltar a atribuir o problema à GPU do usuário.
+
+---
+
 ## 2026-06-20 (sáb) — Amplia limite de repetições do Smear
 
 - A pedido do usuário, o slider **Repetições** do Smear passou de máximo 60 para **300**.

@@ -181,7 +181,7 @@ label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt
       <button class="add-bit" data-add="crossmix"><span class="ic">⊞</span><span>Cross-mix</span><span class="kind">bitstream</span></button>
       <button class="add-bit" data-add="keyinject"><span class="ic">⬛</span><span>Key inject</span><span class="kind">bitstream</span></button>
     </div>
-    <h2 style="margin-top:10px">Slice-level <span class="hint" style="font-size:9px">(aviso: pode abortar decode em GPU fraca)</span></h2>
+    <h2 style="margin-top:10px">Slice-level <span class="hint" style="font-size:9px">(parser H.264 estrutural)</span></h2>
     <div class="add-grid">
       <button class="add-bit" data-add="slicedrop"><span class="ic">⌐</span><span>Slice drop</span><span class="kind">slice</span></button>
       <button class="add-bit" data-add="slicehdr"><span class="ic">⌙</span><span>Slice hdr</span><span class="kind">slice</span></button>
@@ -270,7 +270,7 @@ function makeLayer(type){
     case "stutter":    return { ...base, kind:"bitstream",name:"Stutter",    windowSize:3, pattern:"3,1,2,1" };
     case "crossmix":   return { ...base, kind:"bitstream",name:"Cross-mix",  fromFrame:0, count:15, sourceIdx:1 };
     case "keyinject":  return { ...base, kind:"bitstream",name:"Key inject", atFrame:10 };
-    // === SLICE-LEVEL (best-effort com NAL parsing — pode abortar decode em GPU fraca) ===
+    // === SLICE-LEVEL (parser AVCC/RBSP + SPS/PPS + slice header) ===
     case "slicedrop":  return { ...base, kind:"bitstream",name:"Slice drop", count:3, intensity:40 };
     case "slicehdr":   return { ...base, kind:"bitstream",name:"Slice hdr",  count:3, intensity:50 };
     case "mblock":     return { ...base, kind:"bitstream",name:"MBlock swap",count:3, intensity:50 };
@@ -561,11 +561,10 @@ function applyKeyInject(chunks, atFrame){
 }
 
 /* ============================================================
-   EFEITOS SLICE-LEVEL (best-effort com NAL parsing)
-   Parse minimal de NAL units — identifica start codes (00 00 01 ou 00 00 00 01)
-   e tipos de NAL (NAL header byte). Para H.264 baseline, slice non-IDR = NAL type 1,
-   slice IDR = NAL type 5. Estes efeitos são CIRÚRGICOS mas podem abortar decode
-   em GPU fraca — usar com cuidado.
+   EFEITOS SLICE-LEVEL ESTRUTURADOS
+   Parse AVCC/Annex-B, remove emulation-prevention para operar em RBSP, lê SPS/PPS
+   e percorre slice headers bit a bit. Nenhum efeito abaixo usa offsets mágicos
+   ou XOR cego em headers/entropy data.
    ============================================================ */
 
 /** Encontra os NAL units dentro de um chunk.
@@ -597,7 +596,7 @@ function findNalUnits(data){
         scLen = 3; hdrOff = i + 3;
       } else { i++; continue; }
       const nalType = data[hdrOff] & 0x1f;
-      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: data.length });
+      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: data.length, format:"annexb", prefixLength:scLen });
       if (nals.length > 1) nals[nals.length - 2].end = i;
       i = hdrOff + 1;
     }
@@ -605,135 +604,578 @@ function findNalUnits(data){
     // AVCC: length-prefixed. 4 bytes de tamanho + NAL. Itera até acabar.
     let i = 0;
     while (i + 4 <= data.length){
-      const len = (data[i] << 24) | (data[i+1] << 16) | (data[i+2] << 8) | data[i+3];
+      const len = data[i] * 0x1000000 + data[i+1] * 0x10000 + data[i+2] * 0x100 + data[i+3];
       if (len <= 0 || i + 4 + len > data.length) break; // tamanho inválido — aborta
       const hdrOff = i + 4;
       const nalType = data[hdrOff] & 0x1f;
-      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: i + 4 + len });
+      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: i + 4 + len, format:"avcc", prefixLength:4 });
       i = i + 4 + len;
     }
   }
   return nals;
 }
 
-/** SLICE DROP: dropa NAL units de slice (type 1) dentro de N chunks delta.
- *  Causa "torn horizontal" — metade do frame OK, metade derreteu. */
-function applySliceDrop(chunks, count, intensity01, rng){
-  if (intensity01 <= 0) return { chunks, affected: [], droppedNals: 0 };
-  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
-  if (deltaIdxs.length === 0) return { chunks, affected: [], droppedNals: 0 };
-  const chosen = new Set();
-  let guard = 0;
-  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
-    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
-    guard++;
-  }
-  let droppedNals = 0;
-  const dropRatio = 0.3 + intensity01 * 0.5; // 30-80% dos slices dropados por chunk
-  const out = chunks.map((c, i) => {
-    if (!chosen.has(i)) return c;
-    const nals = findNalUnits(c.data);
-    if (nals.length === 0) return c;
-    // identificação de slice: type 1 (non-IDR) ou type 5 (IDR) — dropa só type 1
-    const dropSet = new Set();
-    for (const n of nals){
-      if (n.nalType === 1 && rng() < dropRatio){
-        dropSet.add(n.start);
-        droppedNals++;
-      }
-    }
-    if (dropSet.size === 0) return c;
-    // reconstrói o buffer sem os NALs dropados (preserva prefixo de cada NAL restante)
-    const pieces = [];
-    let cursor = 0;
-    for (const n of nals){
-      if (dropSet.has(n.start)){
-        // preserva bytes antes do NAL dropado
-        if (cursor < n.start) pieces.push(c.data.subarray(cursor, n.start));
-        cursor = n.end;
-      }
-    }
-    if (cursor < c.data.length) pieces.push(c.data.subarray(cursor));
-    const newLen = pieces.reduce((s, p) => s + p.length, 0);
-    const d = new Uint8Array(newLen);
-    let off = 0;
-    for (const p of pieces){ d.set(p, off); off += p.length; }
-    return { ...c, data: d };
-  });
-  return { chunks: out, affected: [...chosen], droppedNals };
+function toU8(data){
+  if (data instanceof Uint8Array) return data;
+  if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  return new Uint8Array(data);
 }
 
-/** SLICE HDR CORRUPT: corrompe bytes específicos do slice header (após o NAL header byte).
- *  Slice header começa logo após o NAL header (1 byte) e contém: first_mb_in_slice,
- *  slice_type, frame_num (Exp-Golomb). XOR nos primeiros ~6 bytes após o header
- *  afeta esses campos — decoder reaplica frames errados. */
-function applySliceHdrCorrupt(chunks, count, intensity01, rng){
-  if (intensity01 <= 0) return { chunks, affected: [], corruptedNals: 0 };
-  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
-  if (deltaIdxs.length === 0) return { chunks, affected: [], corruptedNals: 0 };
-  const chosen = new Set();
-  let guard = 0;
-  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
-    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
-    guard++;
+/** Remove/insere emulation-prevention bytes. Slice syntax é definida no RBSP;
+ *  editar o EBSP diretamente (como antes) desloca campos e pode criar start codes. */
+function ebspToRbsp(ebsp){
+  const out = [];
+  let zeros = 0;
+  for (let i = 0; i < ebsp.length; i++){
+    const b = ebsp[i];
+    if (zeros >= 2 && b === 0x03){ zeros = 0; continue; }
+    out.push(b);
+    zeros = b === 0 ? zeros + 1 : 0;
   }
-  let corruptedNals = 0;
-  const xorVal = 0x40 + Math.round(intensity01 * 0x80);
-  const out = chunks.map((c, i) => {
-    if (!chosen.has(i)) return c;
-    const nals = findNalUnits(c.data);
-    if (nals.length === 0) return c;
-    const d = new Uint8Array(c.data);
-    for (const n of nals){
-      if (n.nalType !== 1) continue; // só slice non-IDR
-      // slice header começa em n.hdrOffset + 1 (após o NAL header byte)
-      // corrompe os primeiros ~6 bytes do slice header (Exp-Golomb: first_mb, slice_type, frame_num)
-      const start = n.hdrOffset + 1;
-      for (let k = 0; k < 6 && start + k < d.length; k++){
-        d[start + k] ^= xorVal;
-      }
-      corruptedNals++;
-    }
-    return { ...c, data: d };
-  });
-  return { chunks: out, affected: [...chosen], corruptedNals };
+  return Uint8Array.from(out);
 }
 
-/** MBLOCK SWAP: corrompe bytes profundos no slice DATA (após header) — afeta
- *  codificação de macroblocks. Causa "block mosaic" aleatório. Best-effort: sem
- *  parser Exp-Golomb completo, faz XOR em padrões regulares profundos no slice. */
-function applyMBlockSwap(chunks, count, intensity01, rng){
-  if (intensity01 <= 0) return { chunks, affected: [], corruptedMbs: 0 };
-  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
-  if (deltaIdxs.length === 0) return { chunks, affected: [], corruptedMbs: 0 };
+function rbspToEbsp(rbsp){
+  const out = [];
+  let zeros = 0;
+  for (const b of rbsp){
+    if (zeros >= 2 && b <= 0x03){ out.push(0x03); zeros = 0; }
+    out.push(b);
+    zeros = b === 0 ? zeros + 1 : 0;
+  }
+  return Uint8Array.from(out);
+}
+
+class H264BitReader {
+  constructor(data){ this.data = data; this.bitPosition = 0; }
+  readBit(){
+    if (this.bitPosition >= this.data.length * 8) throw new Error("RBSP truncado");
+    const pos = this.bitPosition++;
+    return (this.data[pos >> 3] >> (7 - (pos & 7))) & 1;
+  }
+  readBits(count){
+    let value = 0;
+    for (let i = 0; i < count; i++) value = value * 2 + this.readBit();
+    return value;
+  }
+  readUE(){
+    let zeros = 0;
+    while (this.readBit() === 0){
+      zeros++;
+      if (zeros > 31) throw new Error("Exp-Golomb inválido");
+    }
+    return (Math.pow(2, zeros) - 1) + (zeros ? this.readBits(zeros) : 0);
+  }
+  readSE(){
+    const codeNum = this.readUE();
+    return codeNum & 1 ? (codeNum + 1) / 2 : -(codeNum / 2);
+  }
+  skipBits(count){ for (let i = 0; i < count; i++) this.readBit(); }
+}
+
+function ceilLog2(value){ return value <= 1 ? 0 : Math.ceil(Math.log2(value)); }
+
+function skipScalingList(br, size){
+  let lastScale = 8, nextScale = 8;
+  for (let j = 0; j < size; j++){
+    if (nextScale !== 0){
+      const deltaScale = br.readSE();
+      nextScale = (lastScale + deltaScale + 256) & 255;
+    }
+    lastScale = nextScale === 0 ? lastScale : nextScale;
+  }
+}
+
+function parseSpsNal(nal){
+  try {
+    const rbsp = ebspToRbsp(nal.subarray(1));
+    const br = new H264BitReader(rbsp);
+    const profileIdc = br.readBits(8);
+    br.skipBits(8); // constraint flags + reserved
+    br.skipBits(8); // level_idc
+    const id = br.readUE();
+    let chromaFormatIdc = 1, separateColourPlaneFlag = 0;
+    const highProfiles = new Set([100,110,122,244,44,83,86,118,128,138,139,134,135]);
+    if (highProfiles.has(profileIdc)){
+      chromaFormatIdc = br.readUE();
+      if (chromaFormatIdc === 3) separateColourPlaneFlag = br.readBit();
+      br.readUE(); // bit_depth_luma_minus8
+      br.readUE(); // bit_depth_chroma_minus8
+      br.readBit(); // qpprime_y_zero_transform_bypass_flag
+      if (br.readBit()){
+        const count = chromaFormatIdc !== 3 ? 8 : 12;
+        for (let i = 0; i < count; i++) if (br.readBit()) skipScalingList(br, i < 6 ? 16 : 64);
+      }
+    }
+    const log2MaxFrameNum = br.readUE() + 4;
+    const picOrderCntType = br.readUE();
+    let log2MaxPicOrderCntLsb = 0;
+    let deltaPicOrderAlwaysZeroFlag = 0;
+    if (picOrderCntType === 0){
+      log2MaxPicOrderCntLsb = br.readUE() + 4;
+    } else if (picOrderCntType === 1){
+      deltaPicOrderAlwaysZeroFlag = br.readBit();
+      br.readSE(); br.readSE();
+      const cycle = br.readUE();
+      for (let i = 0; i < cycle; i++) br.readSE();
+    }
+    br.readUE(); // max_num_ref_frames
+    const gapsInFrameNumAllowedFlag = br.readBit();
+    const picWidthInMbsMinus1 = br.readUE();
+    const picHeightInMapUnitsMinus1 = br.readUE();
+    const frameMbsOnlyFlag = br.readBit();
+    if (!frameMbsOnlyFlag) br.readBit(); // mb_adaptive_frame_field_flag
+    br.readBit(); // direct_8x8_inference_flag
+    if (br.readBit()){
+      br.readUE(); br.readUE(); br.readUE(); br.readUE();
+    }
+    return { id, profileIdc, chromaFormatIdc, separateColourPlaneFlag,
+      log2MaxFrameNum, picOrderCntType, log2MaxPicOrderCntLsb,
+      deltaPicOrderAlwaysZeroFlag, gapsInFrameNumAllowedFlag,
+      picWidthInMbsMinus1, picHeightInMapUnitsMinus1, frameMbsOnlyFlag };
+  } catch(e){ return null; }
+}
+
+function parsePpsNal(nal){
+  try {
+    const rbsp = ebspToRbsp(nal.subarray(1));
+    const br = new H264BitReader(rbsp);
+    const id = br.readUE();
+    const spsId = br.readUE();
+    const entropyCodingModeFlag = br.readBit();
+    const bottomFieldPicOrderInFramePresentFlag = br.readBit();
+    const numSliceGroupsMinus1 = br.readUE();
+    let sliceGroupMapType = 0, sliceGroupChangeRateMinus1 = 0;
+    if (numSliceGroupsMinus1 > 0){
+      sliceGroupMapType = br.readUE();
+      if (sliceGroupMapType === 0){
+        for (let i = 0; i <= numSliceGroupsMinus1; i++) br.readUE();
+      } else if (sliceGroupMapType === 2){
+        for (let i = 0; i < numSliceGroupsMinus1; i++){ br.readUE(); br.readUE(); }
+      } else if (sliceGroupMapType >= 3 && sliceGroupMapType <= 5){
+        br.readBit();
+        sliceGroupChangeRateMinus1 = br.readUE();
+      } else if (sliceGroupMapType === 6){
+        const picSizeInMapUnitsMinus1 = br.readUE();
+        const bits = ceilLog2(numSliceGroupsMinus1 + 1);
+        for (let i = 0; i <= picSizeInMapUnitsMinus1; i++) br.readBits(bits);
+      }
+    }
+    const numRefIdxL0DefaultActiveMinus1 = br.readUE();
+    const numRefIdxL1DefaultActiveMinus1 = br.readUE();
+    const weightedPredFlag = br.readBit();
+    const weightedBipredIdc = br.readBits(2);
+    const picInitQpMinus26 = br.readSE();
+    br.readSE(); // pic_init_qs_minus26
+    br.readSE(); // chroma_qp_index_offset
+    const deblockingFilterControlPresentFlag = br.readBit();
+    br.readBit(); // constrained_intra_pred_flag
+    const redundantPicCntPresentFlag = br.readBit();
+    return { id, spsId, entropyCodingModeFlag, bottomFieldPicOrderInFramePresentFlag,
+      numSliceGroupsMinus1, sliceGroupMapType, sliceGroupChangeRateMinus1,
+      numRefIdxL0DefaultActiveMinus1, numRefIdxL1DefaultActiveMinus1,
+      weightedPredFlag, weightedBipredIdc, picInitQpMinus26,
+      deblockingFilterControlPresentFlag, redundantPicCntPresentFlag };
+  } catch(e){ return null; }
+}
+
+function parseAvcDecoderDescription(description){
+  try {
+    if (!description) return null;
+    const data = toU8(description);
+    if (data.length < 7 || data[0] !== 1) return null;
+    const sps = new Map(), pps = new Map();
+    let offset = 5;
+    const numSps = data[offset++] & 0x1f;
+    for (let i = 0; i < numSps; i++){
+      const len = data[offset] * 256 + data[offset+1]; offset += 2;
+      const nal = data.slice(offset, offset + len); offset += len;
+      const parsed = parseSpsNal(nal); if (parsed) sps.set(parsed.id, parsed);
+    }
+    const numPps = data[offset++];
+    for (let i = 0; i < numPps; i++){
+      const len = data[offset] * 256 + data[offset+1]; offset += 2;
+      const nal = data.slice(offset, offset + len); offset += len;
+      const parsed = parsePpsNal(nal); if (parsed) pps.set(parsed.id, parsed);
+    }
+    return sps.size && pps.size ? { sps, pps } : null;
+  } catch(e){ return null; }
+}
+
+function skipRefPicListModification(br, sliceTypeMod){
+  if (sliceTypeMod !== 2 && sliceTypeMod !== 4){
+    if (br.readBit()){
+      while (true){
+        const idc = br.readUE();
+        if (idc === 3) break;
+        if (idc === 0 || idc === 1 || idc === 2) br.readUE();
+        else throw new Error("ref_pic_list_modification inválido");
+      }
+    }
+  }
+  if (sliceTypeMod === 1 && br.readBit()){
+    while (true){
+      const idc = br.readUE();
+      if (idc === 3) break;
+      if (idc === 0 || idc === 1 || idc === 2) br.readUE();
+      else throw new Error("ref_pic_list_modification_l1 inválido");
+    }
+  }
+}
+
+function skipPredWeightTable(br, sps, numRefL0, numRefL1, sliceTypeMod){
+  br.readUE(); // luma_log2_weight_denom
+  const chromaArrayType = sps.separateColourPlaneFlag ? 0 : sps.chromaFormatIdc;
+  if (chromaArrayType !== 0) br.readUE();
+  const skipList = (count) => {
+    for (let i = 0; i < count; i++){
+      if (br.readBit()){ br.readSE(); br.readSE(); }
+      if (chromaArrayType !== 0 && br.readBit()){
+        for (let j = 0; j < 2; j++){ br.readSE(); br.readSE(); }
+      }
+    }
+  };
+  skipList(numRefL0);
+  if (sliceTypeMod === 1) skipList(numRefL1);
+}
+
+function skipDecRefPicMarking(br, nalType){
+  if (nalType === 5){ br.readBit(); br.readBit(); return; }
+  if (!br.readBit()) return;
+  while (true){
+    const mmco = br.readUE();
+    if (mmco === 0) break;
+    if (mmco === 1 || mmco === 3) br.readUE();
+    if (mmco === 2) br.readUE();
+    if (mmco === 3 || mmco === 6) br.readUE();
+    if (mmco === 4) br.readUE();
+    if (mmco > 6) throw new Error("MMCO inválido");
+  }
+}
+
+/** Parseia o slice header baseline/CAVLC até o início exato de slice_data. */
+function parseSliceHeader(nal, codecContext){
+  try {
+    if (!codecContext || !nal || nal.length < 2) return null;
+    const nalType = nal[0] & 0x1f;
+    const nalRefIdc = (nal[0] >> 5) & 3;
+    if (nalType !== 1 && nalType !== 5) return null;
+    const rbsp = ebspToRbsp(nal.subarray(1));
+    const br = new H264BitReader(rbsp);
+    const firstMbInSlice = br.readUE();
+    const sliceType = br.readUE();
+    const sliceTypeMod = sliceType % 5;
+    const ppsId = br.readUE();
+    const pps = codecContext.pps.get(ppsId);
+    if (!pps) return null;
+    const sps = codecContext.sps.get(pps.spsId);
+    if (!sps) return null;
+    if (sps.separateColourPlaneFlag) br.readBits(2);
+
+    const frameNumBitOffset = br.bitPosition;
+    const frameNum = br.readBits(sps.log2MaxFrameNum);
+    let fieldPicFlag = 0;
+    if (!sps.frameMbsOnlyFlag){
+      fieldPicFlag = br.readBit();
+      if (fieldPicFlag) br.readBit();
+    }
+    if (nalType === 5) br.readUE();
+
+    let pocBitOffset = -1, pocBitLength = 0, pocValue = 0;
+    if (sps.picOrderCntType === 0){
+      pocBitOffset = br.bitPosition;
+      pocBitLength = sps.log2MaxPicOrderCntLsb;
+      pocValue = br.readBits(pocBitLength);
+      if (pps.bottomFieldPicOrderInFramePresentFlag && !fieldPicFlag) br.readSE();
+    } else if (sps.picOrderCntType === 1 && !sps.deltaPicOrderAlwaysZeroFlag){
+      br.readSE();
+      if (pps.bottomFieldPicOrderInFramePresentFlag && !fieldPicFlag) br.readSE();
+    }
+    if (pps.redundantPicCntPresentFlag) br.readUE();
+    if (sliceTypeMod === 1) br.readBit();
+
+    let numRefL0 = pps.numRefIdxL0DefaultActiveMinus1 + 1;
+    let numRefL1 = pps.numRefIdxL1DefaultActiveMinus1 + 1;
+    if (sliceTypeMod === 0 || sliceTypeMod === 1 || sliceTypeMod === 3){
+      if (br.readBit()){
+        numRefL0 = br.readUE() + 1;
+        if (sliceTypeMod === 1) numRefL1 = br.readUE() + 1;
+      }
+    }
+    skipRefPicListModification(br, sliceTypeMod);
+    const weighted = (pps.weightedPredFlag && (sliceTypeMod === 0 || sliceTypeMod === 3)) ||
+      (pps.weightedBipredIdc === 1 && sliceTypeMod === 1);
+    if (weighted) skipPredWeightTable(br, sps, numRefL0, numRefL1, sliceTypeMod);
+    if (nalRefIdc !== 0) skipDecRefPicMarking(br, nalType);
+    if (pps.entropyCodingModeFlag && sliceTypeMod !== 2 && sliceTypeMod !== 4) br.readUE();
+
+    const sliceQpDeltaBitOffset = br.bitPosition;
+    const sliceQpDelta = br.readSE();
+    const sliceQpDeltaBitEnd = br.bitPosition;
+    if (sliceTypeMod === 3 || sliceTypeMod === 4){
+      if (sliceTypeMod === 3) br.readBit();
+      br.readSE();
+    }
+    if (pps.deblockingFilterControlPresentFlag){
+      const disableDeblockingFilterIdc = br.readUE();
+      if (disableDeblockingFilterIdc !== 1){ br.readSE(); br.readSE(); }
+    }
+    if (pps.numSliceGroupsMinus1 > 0 && pps.sliceGroupMapType >= 3 && pps.sliceGroupMapType <= 5){
+      const picSize = (sps.picWidthInMbsMinus1 + 1) * (sps.picHeightInMapUnitsMinus1 + 1);
+      const rate = pps.sliceGroupChangeRateMinus1 + 1;
+      br.readBits(ceilLog2(Math.ceil(picSize / rate) + 1));
+    }
+    if (pps.entropyCodingModeFlag){
+      while (br.bitPosition & 7) br.readBit();
+    }
+    return { nalType, nalRefIdc, rbsp, pps, sps, firstMbInSlice, sliceType, sliceTypeMod,
+      frameNumBitOffset, frameNum, frameNumBitLength:sps.log2MaxFrameNum,
+      pocBitOffset, pocBitLength, pocValue,
+      sliceQpDeltaBitOffset, sliceQpDeltaBitEnd, sliceQpDelta,
+      headerEndBit:br.bitPosition };
+  } catch(e){ return null; }
+}
+
+function rbspStopBitPosition(rbsp){
+  for (let pos = rbsp.length * 8 - 1; pos >= 0; pos--){
+    if ((rbsp[pos >> 3] >> (7 - (pos & 7))) & 1) return pos;
+  }
+  return -1;
+}
+
+function readBitAt(data, pos){ return (data[pos >> 3] >> (7 - (pos & 7))) & 1; }
+function writeBitAt(data, pos, bit){
+  const mask = 1 << (7 - (pos & 7));
+  if (bit) data[pos >> 3] |= mask; else data[pos >> 3] &= ~mask;
+}
+
+function encodeUEBits(value){
+  const codeNum = Math.max(0, Math.floor(value)) + 1;
+  const leading = Math.floor(Math.log2(codeNum));
+  const bits = new Array(leading).fill(0);
+  for (let i = leading; i >= 0; i--) bits.push((codeNum >> i) & 1);
+  return bits;
+}
+function encodeSEBits(value){
+  const v = Math.trunc(value);
+  return encodeUEBits(v <= 0 ? -2 * v : 2 * v - 1);
+}
+
+/** Substitui um campo variável no RBSP e recria rbsp_trailing_bits corretamente. */
+function replaceRbspBitRange(rbsp, startBit, endBit, replacementBits){
+  const stop = rbspStopBitPosition(rbsp);
+  if (stop < 0 || startBit < 0 || endBit < startBit || endBit > stop) return null;
+  const payloadBits = startBit + replacementBits.length + (stop - endBit);
+  const out = new Uint8Array(Math.ceil((payloadBits + 1) / 8));
+  let dst = 0;
+  for (let src = 0; src < startBit; src++) writeBitAt(out, dst++, readBitAt(rbsp, src));
+  for (const bit of replacementBits) writeBitAt(out, dst++, bit);
+  for (let src = endBit; src < stop; src++) writeBitAt(out, dst++, readBitAt(rbsp, src));
+  writeBitAt(out, dst, 1);
+  return out;
+}
+
+function setFixedBits(data, offset, length, value){
+  for (let i = 0; i < length; i++){
+    const divisor = Math.pow(2, length - 1 - i);
+    writeBitAt(data, offset + i, Math.floor(value / divisor) & 1);
+  }
+}
+
+/** Mantém o header do slice atual e injeta slice_data completo de um donor válido. */
+function replaceSliceData(current, donor){
+  const donorStop = rbspStopBitPosition(donor.rbsp);
+  if (donorStop < donor.headerEndBit) return null;
+  const payloadLength = donorStop - donor.headerEndBit;
+  const totalBeforeStop = current.headerEndBit + payloadLength;
+  const out = new Uint8Array(Math.ceil((totalBeforeStop + 1) / 8));
+  let dst = 0;
+  for (let src = 0; src < current.headerEndBit; src++) writeBitAt(out, dst++, readBitAt(current.rbsp, src));
+  for (let src = donor.headerEndBit; src < donorStop; src++) writeBitAt(out, dst++, readBitAt(donor.rbsp, src));
+  writeBitAt(out, dst, 1);
+  return out;
+}
+
+function nalFromRbsp(headerByte, rbsp){
+  const ebsp = rbspToEbsp(rbsp);
+  const nal = new Uint8Array(1 + ebsp.length);
+  nal[0] = headerByte;
+  nal.set(ebsp, 1);
+  return nal;
+}
+
+function concatBytes(parts){
+  const length = parts.reduce((sum, p) => sum + p.length, 0);
+  const out = new Uint8Array(length);
+  let offset = 0;
+  for (const p of parts){ out.set(p, offset); offset += p.length; }
+  return out;
+}
+
+/** Reconstrói AVCC/Annex-B atualizando length-prefix quando o RBSP muda de tamanho. */
+function rebuildNalChunk(data, nals, replacements, drops){
+  const parts = [];
+  let cursor = 0;
+  for (const n of nals){
+    if (cursor < n.start) parts.push(data.slice(cursor, n.start));
+    if (!drops || !drops.has(n.start)){
+      const replacement = replacements && replacements.get(n.start);
+      if (!replacement){
+        parts.push(data.slice(n.start, n.end));
+      } else if (n.format === "avcc"){
+        const prefix = new Uint8Array(4);
+        const len = replacement.length;
+        prefix[0] = (len >>> 24) & 255; prefix[1] = (len >>> 16) & 255;
+        prefix[2] = (len >>> 8) & 255; prefix[3] = len & 255;
+        parts.push(prefix, replacement);
+      } else {
+        parts.push(data.slice(n.start, n.hdrOffset), replacement);
+      }
+    }
+    cursor = n.end;
+  }
+  if (cursor < data.length) parts.push(data.slice(cursor));
+  return concatBytes(parts);
+}
+
+function chooseDeltaChunks(chunks, count, rng){
+  const candidates = chunks.map((c,i) => c.type === "delta" ? i : -1).filter(i => i >= 0);
   const chosen = new Set();
   let guard = 0;
-  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
-    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
-    guard++;
+  while (chosen.size < Math.min(count, candidates.length) && guard++ < 1000){
+    chosen.add(candidates[Math.floor(rng() * candidates.length)]);
   }
-  let corruptedMbs = 0;
-  const xorVal = 0x80 + Math.round(intensity01 * 0x7F);
-  // stride menor que corrupt (mais denso) — afeta mais macroblocks
-  const stride = Math.round(8 - intensity01 * 5); // 3..8
+  return { candidates, chosen };
+}
+
+/** SLICE DROP seguro:
+ *  - frame com múltiplos slices: remove alguns, mas NUNCA todos;
+ *  - encoder com um slice por frame (caso comum do WebCodecs): remove o chunk inteiro,
+ *    em vez de entregar ao decoder um EncodedVideoChunk vazio/malformado. */
+function applySliceDrop(chunks, count, intensity01, rng, fps){
+  if (intensity01 <= 0) return { chunks, affected: [], droppedNals: 0, droppedChunks: 0, skipped: 0 };
+  const { chosen } = chooseDeltaChunks(chunks, count, rng);
+  let droppedNals = 0, droppedChunks = 0, skipped = 0;
+  const out = [];
+  for (let i = 0; i < chunks.length; i++){
+    const c = chunks[i];
+    if (!chosen.has(i)){ out.push(c); continue; }
+    const nals = findNalUnits(c.data);
+    const slices = nals.filter(n => n.nalType === 1);
+    if (slices.length === 0){ skipped++; out.push(c); continue; }
+    if (slices.length === 1){
+      droppedChunks++;
+      droppedNals++;
+      continue;
+    }
+    const maxDrop = slices.length - 1;
+    const target = clamp(Math.round(slices.length * (0.15 + intensity01 * 0.7)), 1, maxDrop);
+    const pool = slices.slice();
+    for (let k = pool.length - 1; k > 0; k--){
+      const j = Math.floor(rng() * (k + 1)); [pool[k], pool[j]] = [pool[j], pool[k]];
+    }
+    const drops = new Set(pool.slice(0, target).map(n => n.start));
+    const data = rebuildNalChunk(c.data, nals, null, drops);
+    droppedNals += drops.size;
+    out.push({ ...c, data });
+  }
+  const retimed = out.map((c, i) => ({ ...c, timestamp:Math.round(i * 1e6 / fps) }));
+  return { chunks:retimed, affected:[...chosen], droppedNals, droppedChunks, skipped };
+}
+
+/** SLICE HEADER REWRITE: altera apenas campos sintaticamente válidos.
+ *  Reescreve slice_qp_delta (Exp-Golomb, reconstruindo o RBSP) e POC fixo quando
+ *  disponível. Não toca first_mb/slice_type/pps_id nem faz XOR cego. */
+function applySliceHdrCorrupt(chunks, count, intensity01, rng, codecContext){
+  if (intensity01 <= 0) return { chunks, affected: [], corruptedNals: 0, skipped: 0 };
+  const { chosen } = chooseDeltaChunks(chunks, count, rng);
+  let rewrittenNals = 0, skipped = 0;
   const out = chunks.map((c, i) => {
     if (!chosen.has(i)) return c;
     const nals = findNalUnits(c.data);
-    if (nals.length === 0) return c;
-    const d = new Uint8Array(c.data);
+    const replacements = new Map();
     for (const n of nals){
       if (n.nalType !== 1) continue;
-      // slice data começa ~após 8-10 bytes do header (first_mb + slice_type + frame_num + pic_order_cnt)
-      // XOR a partir do offset 12 dentro do NAL, stride denso
-      const sliceDataStart = n.hdrOffset + 12;
-      for (let k = sliceDataStart; k < d.length; k += stride){
-        d[k] ^= xorVal;
-        corruptedMbs++;
+      const nal = c.data.slice(n.hdrOffset, n.end);
+      const parsed = parseSliceHeader(nal, codecContext);
+      if (!parsed){ skipped++; continue; }
+      let rbsp = parsed.rbsp.slice();
+
+      // POC tem largura fixa no profile baseline: mudar seu valor não desloca o header.
+      if (parsed.pocBitOffset >= 0 && parsed.pocBitLength > 0){
+        const modulo = Math.pow(2, parsed.pocBitLength);
+        const maxShift = Math.max(1, Math.round(1 + intensity01 * Math.min(15, modulo - 1)));
+        const shift = 1 + Math.floor(rng() * maxShift);
+        const nextPoc = (parsed.pocValue + (rng() < .5 ? -shift : shift) + modulo) % modulo;
+        setFixedBits(rbsp, parsed.pocBitOffset, parsed.pocBitLength, nextPoc);
       }
+
+      // QP é Exp-Golomb variável: re-encoda o campo e desloca slice_data corretamente.
+      const qpBase = 26 + parsed.pps.picInitQpMinus26;
+      const currentQp = clamp(qpBase + parsed.sliceQpDelta, 0, 51);
+      const amplitude = Math.max(1, Math.round(2 + intensity01 * 20));
+      let targetQp = clamp(currentQp + (rng() < .5 ? -amplitude : amplitude), 0, 51);
+      if (targetQp === currentQp) targetQp = currentQp > 25 ? Math.max(0, currentQp-amplitude) : Math.min(51, currentQp+amplitude);
+      const nextDelta = targetQp - qpBase;
+      const rebuilt = replaceRbspBitRange(
+        rbsp,
+        parsed.sliceQpDeltaBitOffset,
+        parsed.sliceQpDeltaBitEnd,
+        encodeSEBits(nextDelta)
+      );
+      if (!rebuilt){ skipped++; continue; }
+      replacements.set(n.start, nalFromRbsp(nal[0], rebuilt));
+      rewrittenNals++;
     }
-    return { ...c, data: d };
+    if (replacements.size === 0) return c;
+    return { ...c, data:rebuildNalChunk(c.data, nals, replacements, null) };
   });
-  return { chunks: out, affected: [...chosen], corruptedMbs };
+  return { chunks:out, affected:[...chosen], corruptedNals:rewrittenNals, rewrittenNals, skipped };
+}
+
+/** MBLOCK/SLICEDATA SWAP: mantém o header do frame atual e troca somente o
+ *  slice_data por um payload CAVLC completo de outro P-frame compatível.
+ *  Diferente do XOR anterior, ambos os lados da emenda começam em limites reais
+ *  obtidos pelo parser, então o decoder continua encontrando sintaxe válida. */
+function applyMBlockSwap(chunks, count, intensity01, rng, codecContext){
+  if (intensity01 <= 0) return { chunks, affected: [], corruptedMbs: 0, skipped: 0 };
+  const { candidates, chosen } = chooseDeltaChunks(chunks, count, rng);
+  let swappedSlices = 0, skipped = 0;
+  const out = chunks.slice();
+  for (const index of chosen){
+    const maxDistance = Math.max(1, Math.round(1 + intensity01 * Math.min(60, candidates.length - 1)));
+    let donorPool = candidates.filter(i => i !== index && Math.abs(i-index) <= maxDistance);
+    if (donorPool.length === 0) donorPool = candidates.filter(i => i !== index);
+    if (donorPool.length === 0){ skipped++; continue; }
+    const donorIndex = donorPool[Math.floor(rng() * donorPool.length)];
+    const currentChunk = chunks[index], donorChunk = chunks[donorIndex];
+    const currentNals = findNalUnits(currentChunk.data);
+    const donorNals = findNalUnits(donorChunk.data);
+    const donors = [];
+    for (const n of donorNals){
+      if (n.nalType !== 1) continue;
+      const nal = donorChunk.data.slice(n.hdrOffset, n.end);
+      const parsed = parseSliceHeader(nal, codecContext);
+      if (parsed) donors.push({ n, nal, parsed });
+    }
+    const replacements = new Map();
+    for (const n of currentNals){
+      if (n.nalType !== 1) continue;
+      const nal = currentChunk.data.slice(n.hdrOffset, n.end);
+      const parsed = parseSliceHeader(nal, codecContext);
+      if (!parsed){ skipped++; continue; }
+      const donor = donors.find(d => d.parsed.firstMbInSlice === parsed.firstMbInSlice && d.parsed.pps.id === parsed.pps.id) || donors[0];
+      if (!donor){ skipped++; continue; }
+      const rebuilt = replaceSliceData(parsed, donor.parsed);
+      if (!rebuilt){ skipped++; continue; }
+      replacements.set(n.start, nalFromRbsp(nal[0], rebuilt));
+      swappedSlices++;
+    }
+    if (replacements.size){
+      out[index] = { ...currentChunk, data:rebuildNalChunk(currentChunk.data, currentNals, replacements, null) };
+    }
+  }
+  return { chunks:out, affected:[...chosen], corruptedMbs:swappedSlices, swappedSlices, skipped };
 }
 
 function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError){
@@ -1145,9 +1587,14 @@ function allCutPoints(total){
 /* ---------- aplica bitstream layers BOTTOM-UP (base do painel → topo) ----------
    Cada camada afeta o que está abaixo dela no painel; logo, efeitos mais
    ao topo do painel são aplicados por último (sobre o resultado acumulado). */
-function applyBitstreamLayers(chunks, fps, rng){
+function applyBitstreamLayers(chunks, fps, rng, decoderDescription){
   let working = chunks;
   const notes = [];
+  const codecContext = parseAvcDecoderDescription(decoderDescription);
+  const needsSliceParser = project.stack.some(l => l.enabled && (l.type === "slicehdr" || l.type === "mblock"));
+  if (needsSliceParser && !codecContext){
+    throw new Error("Slice-level: não foi possível ler SPS/PPS do stream H.264 baseline.");
+  }
   for (let li = project.stack.length - 1; li >= 0; li--){
     const layer = project.stack[li];
     if (!layer.enabled || layer.kind !== "bitstream") continue;
@@ -1201,17 +1648,17 @@ function applyBitstreamLayers(chunks, fps, rng){
       working = r.chunks;
       notes.push(`keyinject(@${r.atFrame})`);
     } else if (layer.type === "slicedrop"){
-      const r = applySliceDrop(working, +layer.count, (+layer.intensity)/100, rng);
+      const r = applySliceDrop(working, +layer.count, (+layer.intensity)/100, rng, fps);
       working = r.chunks;
-      notes.push(`slicedrop(${r.droppedNals} NALs)`);
+      notes.push(`slicedrop(${r.droppedNals} slices; ${r.droppedChunks} frames)`);
     } else if (layer.type === "slicehdr"){
-      const r = applySliceHdrCorrupt(working, +layer.count, (+layer.intensity)/100, rng);
+      const r = applySliceHdrCorrupt(working, +layer.count, (+layer.intensity)/100, rng, codecContext);
       working = r.chunks;
-      notes.push(`slicehdr(${r.corruptedNals} NALs)`);
+      notes.push(`slicehdr(${r.rewrittenNals} headers; ${r.skipped} pulados)`);
     } else if (layer.type === "mblock"){
-      const r = applyMBlockSwap(working, +layer.count, (+layer.intensity)/100, rng);
+      const r = applyMBlockSwap(working, +layer.count, (+layer.intensity)/100, rng, codecContext);
       working = r.chunks;
-      notes.push(`mblock(${r.corruptedMbs} bytes)`);
+      notes.push(`mblock(${r.swappedSlices} payloads; ${r.skipped} pulados)`);
     }
   }
   return { chunks: working, notes };
@@ -2009,7 +2456,7 @@ function buildLayerParams(container, layer){
       <label>Intensidade (30-80% drop) <span class="val lc-int-val">${layer.intensity}</span>
         <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
       </label>
-      <div class="hint">Dropa NAL units de slice dentro dos P-frames — "torn horizontal". Pode abortar decode em GPU fraca.</div>
+      <div class="hint">Remove slices preservando ao menos um por frame. Se o encoder gerar slice único, remove o frame inteiro sem entregar chunk malformado.</div>
     `;
     container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
     container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
@@ -2022,7 +2469,7 @@ function buildLayerParams(container, layer){
       <label>Intensidade <span class="val lc-int-val">${layer.intensity}</span>
         <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
       </label>
-      <div class="hint">Corrompe bytes do slice header (frame_num, slice_type) — decoder reaplica frames errados. Mais cirúrgico que o corrupt genérico.</div>
+      <div class="hint">Reescreve POC e slice QP no RBSP, preservando Exp-Golomb, emulation-prevention e toda a sintaxe do header.</div>
     `;
     container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
     container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
@@ -2035,7 +2482,7 @@ function buildLayerParams(container, layer){
       <label>Intensidade <span class="val lc-int-val">${layer.intensity}</span>
         <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
       </label>
-      <div class="hint">XOR denso no slice data — afeta codificação de macroblocks. "Block mosaic" aleatório. Best-effort sem parser Exp-Golomb completo.</div>
+      <div class="hint">Mantém o header atual e troca slice_data por payload CAVLC completo de outro P-frame compatível, em limites encontrados pelo parser.</div>
     `;
     container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
     container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
@@ -2330,7 +2777,7 @@ async function applyAll(){
       setStatus("Re-aplicando mosh com novos parâmetros…");
       setProgress(0.3);
     }
-    const { chunks: moshed, notes } = applyBitstreamLayers(chunks, fps, rng);
+    const { chunks: moshed, notes } = applyBitstreamLayers(chunks, fps, rng, decoderDescription);
     // guarda moshIdx no resultado — playback precisa para saber se há grupo "acima" para compor
     const moshLayerId = moshIdx >= 0 && project.stack[moshIdx] ? project.stack[moshIdx].id : null;
     lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps, moshIdx, moshLayerId };

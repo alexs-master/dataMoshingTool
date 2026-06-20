@@ -284,6 +284,20 @@
   através de um canvas intermediário, tornando os controles Blend e Opacity funcionais também para
   Pixel sort, RGB shift, Databend, QP boost e Posterize + Dither.
 
+### Fase 19 — Slice-level deixa de ser corrupção cega (2026-06-20)
+- O usuário demonstrou Slice hdr abortando em 31/240 frames. A inspeção mostrou que os três efeitos
+  “slice-level” adicionados externamente não possuíam parser de slice: usavam offsets estimados e XOR
+  sobre dados entropy-coded. A causa era stream sintaticamente inválido, não “GPU fraca”.
+- Foi implementada a cadeia estrutural completa necessária para operar no formato produzido pelo
+  WebCodecs: `avcC → SPS/PPS → NAL AVCC → EBSP→RBSP → Exp-Golomb/slice header → operação →
+  rbsp_trailing_bits → RBSP→EBSP → novo length-prefix`.
+- As operações foram redefinidas para preservar sintaxe: drop nunca deixa chunk vazio; header altera
+  POC/QP por recodificação; MBlock troca payload CAVLC inteiro em limite real de slice. O teste unitário
+  construiu um stream baseline sintético e confirmou round-trip parseável para todas as operações.
+- Limitação honesta: WebCodecs normalmente gera um slice por frame e não expõe controle de divisão
+  em múltiplos slices. Assim, Slice drop single-slice equivale a packet/frame drop, e “MBlock swap”
+  trabalha no payload completo do slice — não finge identificar macroblocos sem parser CAVLC completo.
+
 ---
 
 ## Decisões-chave (resumo)
