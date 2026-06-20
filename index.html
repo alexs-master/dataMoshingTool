@@ -1362,8 +1362,7 @@ function hasSrcBelowMosh(){
 
 /** True se há camadas src/pixelfx habilitadas no grupo "acima" (índices < moshIdx).
  *  Essas camadas serão composições em tempo real sobre o frame decodificado. */
-function hasSrcAboveMosh(){
-  const moshIdx = getMoshScopeIdx();
+function hasSrcAboveMosh(moshIdx = getMoshScopeIdx()){
   if (moshIdx <= 0) return false;
   for (let i = 0; i < moshIdx; i++){
     const l = project.stack[i];
@@ -2435,21 +2434,23 @@ function startPlayback(){
  *  Se há grupo "acima" (moshIdx > 0 com src/pixelfx acima da fronteira bitstream),
  *  compõe esse grupo em tempo real sobre cada frame decodificado. Usa double-buffering
  *  (back OffscreenCanvas → canvas visível) para evitar flicker durante o await do renderFrame. */
-function startDecodedPlayback(frames, w, h, fps, moshIdx){
-  const player = { cancelled: false };
+function startDecodedPlayback(frames, w, h, fps, moshIdx, startIndex = 0){
+  const player = { cancelled: false, frameIndex: 0 };
   currentPlaybackPlayer = player;
   const canvas = $("stage");
   if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const total = frames.length;
-  const hasAbove = moshIdx > 0 && hasSrcAboveMosh();
-  // back buffer só é alocado se precisar compor o grupo "acima" (evita alocação desnecessária)
-  const back = hasAbove ? new OffscreenCanvas(w, h) : null;
-  const bctx = hasAbove ? back.getContext("2d", { willReadFrequently: true }) : null;
+  // Camadas acima podem mudar durante o playback. O código anterior congelava
+  // essa decisão no Play, então blend/opacity só apareciam após Pause → Play.
+  const canHaveAbove = moshIdx > 0;
+  const back = canHaveAbove ? new OffscreenCanvas(w, h) : null;
+  const bctx = canHaveAbove ? back.getContext("2d", { willReadFrequently: true }) : null;
   const frameDuration = 1000 / fps;
   let nextFrameTime = performance.now();
   let rendering = false;
-  let i = 0;
+  let i = clamp(Math.floor(startIndex) || 0, 0, Math.max(0, frames.length - 1));
+  player.frameIndex = i;
   async function loop(){
     if (player.cancelled) return;
     const now = performance.now();
@@ -2458,6 +2459,7 @@ function startDecodedPlayback(frames, w, h, fps, moshIdx){
       nextFrameTime = now + frameDuration;
       try {
         if (frames[i]){
+          const hasAbove = moshIdx > 0 && hasSrcAboveMosh(moshIdx);
           if (hasAbove){
             // compõe grupo "acima" sobre o frame decodificado (double-buffer p/ evitar flicker)
             bctx.clearRect(0, 0, w, h);
@@ -2471,6 +2473,7 @@ function startDecodedPlayback(frames, w, h, fps, moshIdx){
             ctx.drawImage(frames[i], 0, 0, w, h);
           }
           i = (i + 1) % frames.length;
+          player.frameIndex = i;
         }
       } catch(e){}
       rendering = false;
@@ -2518,6 +2521,31 @@ function startRealtimePlayback(w, h, fps, total){
 }
 
 let autoApplyTimer = null;
+let livePlaybackRestartTimer = null;
+
+/** Atualiza apenas o player já decodificado, sem re-encode ou re-decode.
+ *  Preserva o frame atual e substitui internamente o Pause → Play manual. */
+function refreshDecodedPlaybackState(){
+  if (!isPlaying() || currentDecodedFrames.length === 0 || !lastMoshResult) return;
+  clearTimeout(livePlaybackRestartTimer);
+  livePlaybackRestartTimer = setTimeout(() => {
+    livePlaybackRestartTimer = null;
+    if (!isPlaying() || currentDecodedFrames.length === 0 || !lastMoshResult) return;
+    const resumeAt = currentPlaybackPlayer && Number.isFinite(currentPlaybackPlayer.frameIndex)
+      ? currentPlaybackPlayer.frameIndex : 0;
+    stopPlayback();
+    startDecodedPlayback(
+      currentDecodedFrames,
+      lastMoshResult.width,
+      lastMoshResult.height,
+      lastMoshResult.fps,
+      lastMoshResult.moshIdx,
+      resumeAt
+    );
+  }, 50);
+}
+
+
 function scheduleAutoApply(){
   // se não tem fonte pra renderizar, PARA o playback e limpa o canvas
   if (!hasAnySrc()){
@@ -2535,6 +2563,7 @@ function scheduleAutoApply(){
   // NÃO dispara applyAll automaticamente — o usuário deve clicar Aplicar.
   // Só atualiza o indicador vermelho/verde das camadas bitstream.
   refreshEncDots();
+  refreshDecodedPlaybackState();
 }
 
 /** Marcador para mudanças em params bitstream (melt cortes, bloom target/count,

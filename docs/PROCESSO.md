@@ -262,6 +262,16 @@
   impedido por falha de criação de processo do ambiente Windows, registrada sem transformar essa
   limitação de teste em suposição sobre o computador do usuário.
 
+### Fase 17 — Atualização ao vivo da composição sobre o bitstream (2026-06-20)
+- O novo scoping permitiu manter fontes acima do bitstream fora do encode, mas o playback guardava
+  `hasAbove` como constante ao iniciar. Mudanças posteriores de blend/opacity não ativavam ou
+  reconstruíam a composição; o usuário descobriu que Pause → Play fazia o efeito aparecer.
+- `startDecodedPlayback()` passou a reavaliar as camadas acima a cada frame usando a fronteira do
+  resultado aplicado. Uma renovação leve e debounced do player preserva o frame corrente e elimina
+  a intervenção manual, sem disparar encode/decode nem contrariar a decisão de não haver auto-apply.
+- A distinção semântica permanece: composição acima do bitstream é ao vivo; qualquer alteração no
+  grupo abaixo, já codificado e moshado, requer o botão Aplicar para produzir novos chunks.
+
 ---
 
 ## Decisões-chave (resumo)

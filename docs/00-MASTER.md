@@ -12,10 +12,12 @@
   pixel-fx, mantendo a pilha unificada e o escopo por posição. A regressão que substituiu o decoder
   validado por fallback software + diagnóstico genérico de GPU foi removida em
   `codex/repair-zai-decoder`; o caminho rápido `prefer-hardware` foi restaurado sem apagar os efeitos.
+  A composição acima do bitstream também voltou a reagir a blend/opacity durante o playback.
 - **Prazo de entrega:** SÁBADO 2026-06-20.
 - **Janela de build:** SEXTA 2026-06-19 (estendida para a madrugada de sábado).
 - **➡️ PRÓXIMA AÇÃO ao retomar:** validar com mídia real no navegador do usuário os efeitos
-  bitstream clássicos e, separadamente, os novos efeitos destrutivos de slice/macroblock; depois
+  blend/opacity ao vivo sobre o bitstream, os efeitos bitstream clássicos e, separadamente, os
+  novos efeitos destrutivos de slice/macroblock; depois
   validar o export MP4 fora do navegador. Falhas devem expor o erro real do decoder, sem probe ou
   fallback que as atribua genericamente à GPU.
 - **Log de progresso:** ver `DEVLOG.md` (atualizar a cada etapa).

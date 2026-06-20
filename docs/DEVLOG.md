@@ -6,6 +6,26 @@
 
 ---
 
+## 2026-06-20 (sáb) — Restaura blend/opacity em tempo real durante playback moshado
+
+- **Bug do usuário:** alterar o blend mode de uma camada durante a reprodução não mudava o preview;
+  era necessário clicar Pause e Play para a composição aparecer.
+- **Causa:** o scoping adicionado na continuação pela z.ai calculava `hasAbove` uma única vez dentro
+  de `startDecodedPlayback()`. A existência das camadas compostas acima do bitstream ficava congelada
+  no instante do Play; Pause → Play funcionava porque criava outro player e recalculava essa closure.
+- **Correção:** `hasSrcAboveMosh()` aceita a fronteira aplicada, e o player reavalia `hasAbove` em
+  cada frame. O back buffer fica preparado quando existe fronteira bitstream. Mudanças de composição
+  também renovam somente o player decodificado após debounce de 50 ms, preservando o índice atual;
+  não há re-encode, re-decode, auto-apply ou salto intencional ao começo.
+- A correção vale para blend, opacity, clip, liga/desliga e parâmetros de pixel-fx que passam por
+  `scheduleAutoApply()`. Alterações dentro do grupo já moshado continuam exigindo Aplicar, pois estão
+  fisicamente incorporadas ao bitstream — as camadas acima permanecem realmente ao vivo.
+- Verificação: `git diff --check` e `node --check` passaram. O controle automatizado da aba aberta
+  continuou indisponível pelo erro do sandbox Windows (`CreateProcessWithLogonW: 267`); validação
+  visual final deve ser feita após recarregar o arquivo local.
+
+---
+
 ## 2026-06-20 (sáb) — Repara regressão do decoder introduzida na continuação pela z.ai
 
 - Recebido `C:/Users/nicho/Downloads/index (17).html`, continuação que acrescenta novos efeitos
