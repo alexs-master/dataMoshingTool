@@ -272,6 +272,18 @@
 - A distinção semântica permanece: composição acima do bitstream é ao vivo; qualquer alteração no
   grupo abaixo, já codificado e moshado, requer o botão Aplicar para produzir novos chunks.
 
+### Fase 18 — Fronteira estável por identidade + blend real para pixel-fx (2026-06-20)
+- O teste do usuário com `Databend → Slice hdr → Vídeo` revelou que reavaliar `hasAbove` não bastava:
+  o playback ainda recebia o índice numérico salvo no Apply. Como novas camadas entram no índice 0,
+  o Slice hdr deslocou de 0 para 1 e o índice armazenado deixou de representar a fronteira real.
+- O resultado moshado agora registra o ID da camada bitstream que definiu o escopo. Playback e export
+  reencontram essa camada na pilha atual; uma camada nova acima entra imediatamente na composição sem
+  invalidar ou recodificar o stream abaixo.
+- A revisão encontrou um segundo bug independente: pixel-fx eram gravados por `putImageData`, que
+  ignora blend mode e opacity do contexto. O resultado processado agora é composto por `drawImage`
+  através de um canvas intermediário, tornando os controles Blend e Opacity funcionais também para
+  Pixel sort, RGB shift, Databend, QP boost e Posterize + Dither.
+
 ---
 
 ## Decisões-chave (resumo)

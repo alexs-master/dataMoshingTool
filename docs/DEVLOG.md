@@ -6,6 +6,29 @@
 
 ---
 
+## 2026-06-20 (sáb) — Corrige pixel-fx invisível acima de bitstream + blend ignorado
+
+- **Bug reproduzido pela pilha enviada pelo usuário:** `Databend → Slice hdr → Vídeo`. O Databend
+  acima da fronteira deveria ser composto em tempo real, mas não aparecia nem durante o playback nem
+  depois de Pause → Play.
+- **Causa 1 — fronteira obsoleta:** `lastMoshResult` guardava somente `moshIdx`. O Slice hdr estava
+  no índice 0 no momento do Apply; inserir Databend com `unshift()` o moveu para 1, porém o player
+  continuou renderizando a faixa acima do índice antigo 0 — faixa vazia. Pause → Play reutilizava o
+  mesmo número obsoleto, portanto também não resolvia.
+- **Correção da fronteira:** o resultado passa a guardar `moshLayerId`. Playback e export resolvem a
+  posição atual dessa mesma camada por ID, então inserções no topo não quebram o escopo. O back buffer
+  do player decodificado fica sempre disponível porque uma fronteira inicialmente em 0 pode se mover.
+  Adicionar fonte/pixel-fx também chama o refresh leve da composição.
+- **Causa 2 — blend de pixel-fx nunca era aplicado:** o compositor usava `putImageData()`, API que
+  ignora `globalCompositeOperation` e `globalAlpha`; portanto selecionar Exclusion/Multiply/etc. no
+  card não tinha efeito. O frame processado agora passa por um `OffscreenCanvas` intermediário e é
+  desenhado com o blend e a opacity reais da camada.
+- O mesmo escopo dinâmico foi aplicado ao export MP4, evitando que uma camada adicionada acima suma
+  do arquivo exportado. `git diff --check` e `node --check` passaram. A automação da aba permaneceu
+  bloqueada pelo sandbox Windows, portanto a validação visual final depende do reload local.
+
+---
+
 ## 2026-06-20 (sáb) — Restaura blend/opacity em tempo real durante playback moshado
 
 - **Bug do usuário:** alterar o blend mode de uma camada durante a reprodução não mudava o preview;

@@ -13,6 +13,8 @@
   validado por fallback software + diagnóstico genérico de GPU foi removida em
   `codex/repair-zai-decoder`; o caminho rápido `prefer-hardware` foi restaurado sem apagar os efeitos.
   A composição acima do bitstream também voltou a reagir a blend/opacity durante o playback.
+  A fronteira aplicada é rastreada pelo ID da camada bitstream (não por índice obsoleto), e pixel-fx
+  agora usam blend/opacity reais tanto no preview quanto no export.
 - **Prazo de entrega:** SÁBADO 2026-06-20.
 - **Janela de build:** SEXTA 2026-06-19 (estendida para a madrugada de sábado).
 - **➡️ PRÓXIMA AÇÃO ao retomar:** validar com mídia real no navegador do usuário os efeitos

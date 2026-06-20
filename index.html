@@ -1052,16 +1052,16 @@ async function renderFrame(i, ctx, w, h, total, opts){
       } else if (layer.type === "qpboost"){
         qpBoostSim(snapshot, w, h, +layer.qp, +layer.frames);
       }
-      // Se opacity < 1, mescla o original com o filtrado
-      if (layer.opacity < 1){
-        const original = ctx.getImageData(0, 0, w, h);
-        const a = layer.opacity;
-        const od = original.data, sd = snapshot.data;
-        for (let k=0;k<od.length;k++) od[k] = od[k]*(1-a) + sd[k]*a;
-        ctx.putImageData(original, 0, 0);
-      } else {
-        ctx.putImageData(snapshot, 0, 0);
-      }
+      // putImageData ignora globalCompositeOperation/globalAlpha. O código anterior
+      // escrevia os pixels direto e, por isso, o Blend do pixel-fx não fazia nada.
+      // Passe o resultado por um canvas intermediário e componha de verdade.
+      const processed = new OffscreenCanvas(w, h);
+      processed.getContext("2d").putImageData(snapshot, 0, 0);
+      ctx.save();
+      ctx.globalAlpha = clamp(layer.opacity, 0, 1);
+      ctx.globalCompositeOperation = layer.blend || "source-over";
+      ctx.drawImage(processed, 0, 0);
+      ctx.restore();
       continue;
     }
 
@@ -1370,6 +1370,17 @@ function hasSrcAboveMosh(moshIdx = getMoshScopeIdx()){
     return true; // qualquer layer (mesmo sem mídia) conta — pixelfx aplica sobre o composto
   }
   return false;
+}
+
+/** Resolve a posição ATUAL da mesma camada bitstream usada no último Apply.
+ *  Guardar só o índice era incorreto: inserir uma camada no topo desloca a
+ *  fronteira, embora o stream moshado continue válido. */
+function resolveAppliedMoshIdx(result = lastMoshResult){
+  if (!result) return -1;
+  if (result.moshLayerId != null){
+    return project.stack.findIndex(l => l.id === result.moshLayerId);
+  }
+  return result.moshIdx == null ? -1 : result.moshIdx;
 }
 
 /** Verifica se o encode em cache está atualizado para o estado atual das camadas.
@@ -2106,6 +2117,9 @@ document.querySelectorAll(".add-grid button").forEach(btn => {
       // Não rode um "teste de GPU" aqui: ele não identifica qual efeito gerou um stream
       // inválido e acabava culpando o ambiente por regressões na manipulação dos chunks.
       markBitstreamDirty();
+    } else {
+      // Fonte/pixel-fx novo no topo deve entrar imediatamente na composição ao vivo.
+      scheduleAutoApply();
     }
   };
 });
@@ -2318,7 +2332,8 @@ async function applyAll(){
     }
     const { chunks: moshed, notes } = applyBitstreamLayers(chunks, fps, rng);
     // guarda moshIdx no resultado — playback precisa para saber se há grupo "acima" para compor
-    lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps, moshIdx };
+    const moshLayerId = moshIdx >= 0 && project.stack[moshIdx] ? project.stack[moshIdx].id : null;
+    lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps, moshIdx, moshLayerId };
     lastStaticCanvas = null;
 
     setStatus("Decodificando " + moshed.length + " frames…"); setProgress(0.55);
@@ -2423,7 +2438,14 @@ function startPlayback(){
   const total = Math.max(1, Math.round(project.duration * project.fps));
   if (currentDecodedFrames.length > 0){
     // Mode 2: toca frames decodificados (+ composição "acima" se houver fronteira bitstream)
-    startDecodedPlayback(currentDecodedFrames, lastMoshResult.width, lastMoshResult.height, lastMoshResult.fps, lastMoshResult.moshIdx);
+    startDecodedPlayback(
+      currentDecodedFrames,
+      lastMoshResult.width,
+      lastMoshResult.height,
+      lastMoshResult.fps,
+      lastMoshResult.moshIdx,
+      lastMoshResult.moshLayerId
+    );
   } else if (hasAnySrc()){
     // Mode 1: composição em tempo real
     startRealtimePlayback(project.width, project.height, project.fps, total);
@@ -2434,7 +2456,7 @@ function startPlayback(){
  *  Se há grupo "acima" (moshIdx > 0 com src/pixelfx acima da fronteira bitstream),
  *  compõe esse grupo em tempo real sobre cada frame decodificado. Usa double-buffering
  *  (back OffscreenCanvas → canvas visível) para evitar flicker durante o await do renderFrame. */
-function startDecodedPlayback(frames, w, h, fps, moshIdx, startIndex = 0){
+function startDecodedPlayback(frames, w, h, fps, moshIdx, moshLayerId = null, startIndex = 0){
   const player = { cancelled: false, frameIndex: 0 };
   currentPlaybackPlayer = player;
   const canvas = $("stage");
@@ -2443,9 +2465,9 @@ function startDecodedPlayback(frames, w, h, fps, moshIdx, startIndex = 0){
   const total = frames.length;
   // Camadas acima podem mudar durante o playback. O código anterior congelava
   // essa decisão no Play, então blend/opacity só apareciam após Pause → Play.
-  const canHaveAbove = moshIdx > 0;
-  const back = canHaveAbove ? new OffscreenCanvas(w, h) : null;
-  const bctx = canHaveAbove ? back.getContext("2d", { willReadFrequently: true }) : null;
+  // Sempre disponível: a fronteira pode sair de 0 quando uma camada é inserida no topo.
+  const back = new OffscreenCanvas(w, h);
+  const bctx = back.getContext("2d", { willReadFrequently: true });
   const frameDuration = 1000 / fps;
   let nextFrameTime = performance.now();
   let rendering = false;
@@ -2459,12 +2481,15 @@ function startDecodedPlayback(frames, w, h, fps, moshIdx, startIndex = 0){
       nextFrameTime = now + frameDuration;
       try {
         if (frames[i]){
-          const hasAbove = moshIdx > 0 && hasSrcAboveMosh(moshIdx);
+          const liveMoshIdx = moshLayerId == null
+            ? moshIdx
+            : project.stack.findIndex(l => l.id === moshLayerId);
+          const hasAbove = liveMoshIdx > 0 && hasSrcAboveMosh(liveMoshIdx);
           if (hasAbove){
             // compõe grupo "acima" sobre o frame decodificado (double-buffer p/ evitar flicker)
             bctx.clearRect(0, 0, w, h);
             bctx.drawImage(frames[i], 0, 0, w, h);
-            await renderFrame(i, bctx, w, h, total, { fromIdx: 0, toIdx: moshIdx - 1, clear: false });
+            await renderFrame(i, bctx, w, h, total, { fromIdx: 0, toIdx: liveMoshIdx - 1, clear: false });
             if (player.cancelled) return;
             ctx.clearRect(0, 0, w, h);
             ctx.drawImage(back, 0, 0);
@@ -2540,6 +2565,7 @@ function refreshDecodedPlaybackState(){
       lastMoshResult.height,
       lastMoshResult.fps,
       lastMoshResult.moshIdx,
+      lastMoshResult.moshLayerId,
       resumeAt
     );
   }, 50);
@@ -2620,8 +2646,9 @@ $("exportMp4Btn").onclick = async () => {
     if (lastMoshResult){
       // Modo 2: chunks já moshados
       ({ chunks, decoderDescription, width, height, fps, moshIdx } = lastMoshResult);
+      moshIdx = resolveAppliedMoshIdx(lastMoshResult);
       // Se há grupo "acima", precisa re-codificar com o composto (mosh + acima)
-      if (moshIdx > 0 && hasSrcAboveMosh()){
+      if (moshIdx > 0 && hasSrcAboveMosh(moshIdx)){
         setStatus("Re-codificando com camadas acima (export inclui mosh + composição)…");
         const { frames } = await decodeAllFrames(chunks, decoderDescription, width, height);
         if (frames.length === 0){
