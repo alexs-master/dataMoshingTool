@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-06-20 (sáb) — Retomo o projeto (sessão Claude) + correção do bug "decode falha com bitstream"
+
+- **Contexto:** usuário trabalhou o sistema de camadas numa sessão paralela (outro assistente) e
+  trouxe de volta via zip + `docs/PARA-O-CLAUDE-LER.md`. A versão com camadas (1571 linhas) tinha
+  um bug que frustrou o usuário: **decode falha quando há efeitos bitstream ativos**. Importei essa
+  versão para a branch `feat/layer-system` (commit baseline) antes de corrigir.
+- **Diagnóstico (reproduzido de verdade no navegador):**
+  - Com os parâmetros padrão, melt/bloom/corrupt (e os 3 juntos, até em extremos) **funcionam na
+    minha máquina** — não reproduzi a falha aqui. Logo, é dependente do ambiente do usuário.
+  - Teste isolado forçando o decoder: `prefer-hardware` decodifica 92/92; `prefer-software` e
+    `no-preference` decodificam só 11/92 e abortam ("Decoding error"). **Confirmado:** quando o
+    `prefer-hardware` não consegue dar decode de hardware de verdade (GPU/drivers do usuário), o
+    Chrome cai para software, que aborta no stream moshado (viola `frame_num`).
+  - **`VideoDecoder.isConfigSupported()` é inútil aqui** — retorna `true` tanto p/ hardware quanto
+    software, mas o software aborta no stream quebrado. Não dá p/ feature-detect com ele.
+  - **2º bug, provável regressão e pior em máquina lenta:** `decodeAllFrames` chamava
+    `createImageBitmap(vf)` (assíncrono) e **fechava o `vf` imediatamente** — corrida que máquinas
+    lentas perdem → bitmaps null → "Decode não produziu frames".
+- **Correções:**
+  1. `decodeAllFrames` agora desenha cada `VideoFrame` **síncronamente** num `OffscreenCanvas` e
+     fecha o vf na hora — elimina a corrida (drawImage captura os pixels antes do close). Frames
+     viram `OffscreenCanvas` (compatível com `drawImage` no playback). Removido o polling de 5s/30s.
+  2. **Recuperação parcial:** se o decode aborta no meio, usa os frames que decodificaram (mostra o
+     glitch parcial) em vez de descartar tudo. `decodeAllFrames` retorna `{frames, error}`.
+  3. **Mensagem de erro acionável:** quando 0 frames, roda `hwDecodeProbe()` e, se o ambiente não
+     decoda datamosh, explica que é falta de decode de hardware (aponta `chrome://gpu`) — em vez do
+     críptico "Decode não produziu frames".
+  4. **`hwDecodeProbe()`** (novo): teste de runtime REAL — codifica um clipe minúsculo, duplica um
+     delta (bloom de teste) e tenta decodar; ≥50% dos frames = concealment de hardware OK. Memoizado.
+  5. **Aviso proativo:** ao adicionar a 1ª camada bitstream, roda o probe e avisa NA HORA se o
+     ambiente não vai conseguir — melhor do que descobrir só ao clicar Aplicar.
+- **Verificado no navegador:** caminho feliz (vídeo + melt+bloom+corrupt) processa e toca com pixels
+  reais; o aviso proativo NÃO aparece em máquina capaz (probe passa); sem erros de console.
+- ⚠️ **Não consegui reproduzir a falha exata do usuário** (meu hardware é capaz demais). As correções
+  atacam as duas causas-raiz documentadas. **Pedir ao usuário para testar a versão corrigida e
+  relatar:** (a) se ainda falha, qual a mensagem exata agora; (b) o que diz `chrome://gpu` sobre
+  "Video Decode".
+- ➡️ Próximo: confirmar com o usuário na máquina dele; revisar o resto da implementação de camadas
+  (o usuário também queria que eu olhasse o sistema todo, não só o bug).
+
+---
+
 ## 2026-06-20 (sáb) — Bug: escala/posição não atualizavam ao mexer no slider (sem auto-apply)
 
 - 🐛 **Bug reportado pelo usuário:** "agora a escala não está funcionando! mas puta que pariu!

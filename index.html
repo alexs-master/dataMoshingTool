@@ -1150,6 +1150,16 @@ document.querySelectorAll(".add-grid button").forEach(btn => {
         if (card) card.querySelector(".lc-load").click();
       }, 50);
     }
+    // efeito bitstream: avisa NA HORA se este ambiente não decodifica streams moshados
+    // (decode de software aborta; só hardware tolera). Melhor que falhar só ao clicar Aplicar.
+    if (layer.kind === "bitstream"){
+      hwDecodeProbe().then(ok => {
+        if (!ok && !window.__hwWarned){
+          window.__hwWarned = true;
+          setStatus("⚠ Aviso: este navegador/GPU não decodifica datamosh por hardware — efeitos bitstream podem não renderizar. Veja chrome://gpu ou use Chrome/Edge com aceleração de hardware ativa.");
+        }
+      });
+    }
   };
 });
 
@@ -1290,8 +1300,7 @@ async function applyAll(){
   const total = Math.max(1, Math.round(project.duration * project.fps));
   const hasBS = hasBitstreamLayer();
 
-  // libera frames decodificados antigos
-  currentDecodedFrames.forEach(f => { try { if (f) f.close(); } catch(e){} });
+  // libera frames decodificados antigos (agora são OffscreenCanvas — sem close(); GC cuida disso)
   currentDecodedFrames = [];
 
   // MODO 1: sem bitstream → composição em tempo real (zero encode)
@@ -1328,10 +1337,17 @@ async function applyAll(){
 
     setStatus("Decodificando " + moshed.length + " frames…"); setProgress(0.55);
 
-    // decodifica TODOS os frames e armazena
-    const frames = await decodeAllFrames(moshed, decoderDescription, width, height);
-    if (frames.length === 0 || !frames[0]){
-      setStatus("Decode não produziu frames. Tente reduzir a intensidade.");
+    // decodifica TODOS os frames e armazena (recuperação parcial: usa o que decodificou mesmo se abortou)
+    const { frames, error: decErr } = await decodeAllFrames(moshed, decoderDescription, width, height);
+    if (frames.length === 0){
+      // zero frames = o decoder não conseguiu nem começar. Quase sempre é falta de decode H.264 de
+      // hardware (streams datamoshados violam o spec; só o decoder de hardware tolera via concealment).
+      const hwOk = await hwDecodeProbe();
+      if (!hwOk){
+        setStatus("Seu navegador não conseguiu decodificar o stream moshado — o decode de vídeo por software não tolera datamosh. Ative a aceleração de hardware (veja chrome://gpu) ou use Chrome/Edge com GPU.");
+      } else {
+        setStatus("Decode falhou" + (decErr ? " ("+decErr+")" : "") + ". Tente reduzir a intensidade/contagem dos efeitos.");
+      }
       setProgress(null);
       $("applyBtn").disabled = false;
       applyAllRunning = false;
@@ -1347,7 +1363,12 @@ async function applyAll(){
 
     $("exportMp4Btn").disabled = false;
     $("playPauseBtn").disabled = false;
-    setStatus(`Processado — ${frames.length} frames prontos. Clique Play para reproduzir.`);
+    if (decErr && frames.length < moshed.length){
+      // decode abortou no meio (stream quebrado demais p/ o decoder) — mostra o que deu, com aviso
+      setStatus(`Processado parcialmente — ${frames.length}/${moshed.length} frames (o decoder parou no stream mais quebrado). Reduza a intensidade p/ o resultado completo.`);
+    } else {
+      setStatus(`Processado — ${frames.length} frames prontos. Clique Play para reproduzir.`);
+    }
     setProgress(null);
     refreshEncDots();
   } catch(e){
@@ -1359,8 +1380,14 @@ async function applyAll(){
   applyAllRunning = false;
 }
 
-/** Decodifica TODOS os chunks e retorna array de ImageBitmaps.
- *  Não toca — só produz os frames. */
+/** Decodifica TODOS os chunks e retorna array de frames (OffscreenCanvas).
+ *  Não toca — só produz os frames.
+ *  IMPORTANTE: cada VideoFrame é desenhado SÍNCRONAMENTE num OffscreenCanvas e fechado na hora.
+ *  Antes usava createImageBitmap(vf) (assíncrono) e fechava o vf imediatamente — uma corrida que
+ *  máquinas mais lentas perdiam (bitmap falhava → frames null → "Decode não produziu frames").
+ *  drawImage(vf) é síncrono e captura os pixels antes do close(), eliminando a corrida.
+ *  Retorna { frames, error }: error != null se o decode abortou (stream quebrado demais / sem
+ *  decode de hardware). Mesmo com erro, devolve os frames que decodificaram (recuperação parcial). */
 async function decodeAllFrames(chunks, decoderDescription, w, h){
   const frames = [];
   let error = null;
@@ -1368,8 +1395,11 @@ async function decodeAllFrames(chunks, decoderDescription, w, h){
     let done = false;
     decodeChunks(chunks, decoderDescription, w, h,
       (vf) => {
-        const idx = frames.length; frames.push(null);
-        createImageBitmap(vf).then(bmp => { frames[idx] = bmp; }).catch((e)=>{ console.warn("bitmap fail", e); });
+        try {
+          const oc = new OffscreenCanvas(w, h);
+          oc.getContext("2d").drawImage(vf, 0, 0, w, h); // síncrono — captura antes do close
+          frames.push(oc);
+        } catch(e){ /* frame inválido, ignora */ }
         try { vf.close(); } catch(e){}
       },
       (count, errored) => { done = true; resolve(); },
@@ -1377,18 +1407,37 @@ async function decodeAllFrames(chunks, decoderDescription, w, h){
     );
     setTimeout(() => { if (!done) resolve(); }, 30000);
   });
-  // espera todas as conversões para ImageBitmap
-  const startWait = Date.now();
-  await new Promise(r => {
-    const check = () => {
-      if (frames.length === 0) return r();
-      if (frames.every(f => f !== null)) return r();
-      if (Date.now() - startWait > 5000) return r();
-      setTimeout(check, 16);
-    };
-    check();
-  });
-  return frames;
+  return { frames, error };
+}
+
+/** Testa de VERDADE se este ambiente decodifica um stream datamoshado (P-frame duplicado).
+ *  `VideoDecoder.isConfigSupported()` NÃO serve — ele retorna true para software, que depois
+ *  aborta no stream quebrado. Aqui codificamos um clipe minúsculo, duplicamos um delta (= bloom)
+ *  e tentamos decodar: se sair ≥1 frame, o concealment de hardware funciona; senão, não dá.
+ *  Memoizado (roda uma vez só). */
+let _hwDecodeProbeResult = null;
+async function hwDecodeProbe(){
+  if (_hwDecodeProbeResult !== null) return _hwDecodeProbeResult;
+  try {
+    const W=64,H=64,FPS=24,N=12;
+    const cv=new OffscreenCanvas(W,H); const cx=cv.getContext("2d");
+    const chunks=[]; let dd=null;
+    const enc=new VideoEncoder({ output:(c,m)=>{ if(m&&m.decoderConfig&&m.decoderConfig.description&&!dd)dd=m.decoderConfig.description; const b=new Uint8Array(c.byteLength); c.copyTo(b); chunks.push({type:c.type,timestamp:c.timestamp,duration:c.duration,data:b}); }, error:()=>{} });
+    enc.configure({ codec:CODEC, width:W, height:H, bitrate:500000, framerate:FPS, latencyMode:"realtime", avc:{format:"avc"} });
+    for(let i=0;i<N;i++){ cx.fillStyle=i%2?"#f00":"#00f"; cx.fillRect(0,0,W,H); cx.fillStyle="#fff"; cx.fillRect(i*4%W,0,8,H); const vf=new VideoFrame(cv,{timestamp:Math.round(i*1e6/FPS)}); enc.encode(vf,{keyFrame:i===0}); vf.close(); }
+    await enc.flush(); enc.close();
+    // bloom de teste: duplica o chunk delta 4 dez vezes
+    const dup=chunks[4]||chunks[1]; const dc={...dup,data:dup.data.slice()};
+    const broken=chunks.slice(0,5).concat(new Array(10).fill(dc)).concat(chunks.slice(5)).map((c,i)=>({...c,timestamp:Math.round(i*1e6/FPS)}));
+    let n=0, closed=false;
+    const dec=new VideoDecoder({ output:vf=>{ n++; vf.close(); }, error:()=>{ closed=true; } });
+    dec.configure({ codec:CODEC, codedWidth:W, codedHeight:H, description:dd, hardwareAcceleration:"prefer-hardware" });
+    for(const c of broken){ if(closed)break; try{ dec.decode(new EncodedVideoChunk({type:c.type,timestamp:c.timestamp,duration:c.duration,data:c.data})); }catch(e){ closed=true; break; } }
+    if(!closed){ try{ await dec.flush(); }catch(e){} }
+    try{ if(dec.state!=="closed") dec.close(); }catch(e){}
+    _hwDecodeProbeResult = n > broken.length * 0.5; // decodificou a maioria = concealment OK
+  } catch(e){ _hwDecodeProbeResult = false; }
+  return _hwDecodeProbeResult;
 }
 
 /** Inicia a reprodução. Decide Mode 1 (realtime) ou Mode 2 (decoded frames) automaticamente. */
