@@ -87,9 +87,9 @@ label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt
 .layer-card .lc-enc-dot.fresh{background:var(--ok);box-shadow:0 0 6px rgba(61,220,132,.6)}
 .layer-card .lc-enc-dot.stale{background:#ff2a6d;box-shadow:0 0 6px rgba(255,42,109,.6);animation:pulse-dot 1.4s ease-in-out infinite}
 @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
-.layer-card .lc-name{flex:1;font-size:11.5px;color:var(--txt);background:transparent;border:none;padding:2px 4px;border-radius:3px}
+.layer-card .lc-name{flex:1;min-width:0;font-size:11.5px;color:var(--txt);background:transparent;border:none;padding:2px 4px;border-radius:3px}
 .layer-card .lc-name:focus{background:#1a1a1f;outline:1px solid var(--acc)}
-.layer-card .lc-del{width:18px;height:18px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:13px;padding:0}
+.layer-card .lc-del{width:18px;height:18px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:13px;padding:0;flex-shrink:0}
 .layer-card .lc-del:hover{color:var(--acc)}
 .layer-card .lc-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px}
 .layer-card .lc-controls label{display:flex;flex-direction:column;gap:2px;color:var(--dim)}
