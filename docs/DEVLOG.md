@@ -6,6 +6,31 @@
 
 ---
 
+## 2026-06-20 (sáb) — Repara regressão do decoder introduzida na continuação pela z.ai
+
+- Recebido `C:/Users/nicho/Downloads/index (17).html`, continuação que acrescenta novos efeitos
+  bitstream/pixel e escopo de aplicação por posição na pilha. O arquivo foi comparado com a última
+  versão funcional do repositório; os efeitos novos e a semântica de escopo foram preservados.
+- **Regressão encontrada:** o caminho de decode validado havia sido trocado por uma função `async`
+  com tentativa `prefer-hardware` seguida de fallback silencioso para decoder padrão/software. O
+  fallback não torna streams moshados mais compatíveis e escondia a causa real do erro. Além disso,
+  a UI executava uma sondagem paralela de GPU e convertia qualquer falha em aviso sobre aceleração
+  de hardware, inclusive quando o stream produzido por um efeito específico era inválido.
+- **Correção:** `decodeChunks()` voltou ao caminho simples e rápido já validado: um único
+  `VideoDecoder` configurado com `hardwareAcceleration:'prefer-hardware'`, alimentação ordenada dos
+  chunks e yield periódico. Foram removidos o fallback por software, `hwDecodeProbe()` e os avisos
+  preventivos que culpavam GPU ao adicionar uma camada.
+- Quando nenhum frame é produzido, a interface agora mostra a mensagem real do decoder e orienta a
+  reduzir/desativar o efeito ativo para localizar uma operação destrutiva, sem diagnóstico inventado
+  de GPU. Efeitos novos que deliberadamente alteram headers/slices ainda podem gerar streams que um
+  decoder recuse; isso agora aparece como falha do efeito/stream, não como falta de hardware.
+- Verificação: script ES module extraído do HTML passou em `node --check`; não restaram referências
+  ao probe, ao fallback de software ou a `chrome://gpu`. O navegador automatizado integrado não pôde
+  ser iniciado nesta sessão por falha do ambiente Windows (`CreateProcessWithLogonW: 267`), portanto
+  a validação final com mídia real fica explícita como pendente, sem alegar teste que não ocorreu.
+
+---
+
 ## 2026-06-20 (sáb) — Corrige bloom "congelando" em vez de esticar + badge "undefined" + push da branch
 
 - **Bug do usuário:** "o efeito bloom não está fazendo isso, o vídeo simplesmente para por alguns

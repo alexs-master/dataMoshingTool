@@ -108,6 +108,10 @@ label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt
 .layer-card .lc-mini-tl{position:relative;height:18px;background:#08080a;border:1px solid var(--line);border-radius:3px;overflow:hidden;touch-action:none}
 .layer-card .lc-mini-tl .region{position:absolute;top:0;bottom:0;background:rgba(255,42,109,.32);border-left:2px solid var(--acc);border-right:2px solid var(--acc);cursor:grab}
 .layer-card .lc-mini-tl .region:active{cursor:grabbing}
+.layer-card .seed-row{display:flex;gap:4px;align-items:center}
+.layer-card .seed-row input{flex:1;min-width:0}
+.layer-card .seed-row .lc-randseed{flex:none;padding:4px 8px;font-size:13px;line-height:1;background:var(--line);border:1px solid var(--line);color:var(--txt);border-radius:3px;cursor:pointer}
+.layer-card .seed-row .lc-randseed:hover{border-color:var(--acc);color:var(--acc)}
 .layer-empty{text-align:center;color:var(--dim);font-size:10.5px;padding:30px 10px;line-height:1.5}
 .layer-empty .big{font-size:24px;color:#3a3a44;margin-bottom:8px}
 
@@ -155,11 +159,33 @@ label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt
     <div class="add-grid">
       <button class="add-src" data-add="video"><span class="ic">🎬</span><span>Vídeo</span><span class="kind">fonte</span></button>
       <button class="add-src" data-add="image"><span class="ic">🖼</span><span>Imagem</span><span class="kind">fonte</span></button>
+    </div>
+    <h2 style="margin-top:10px">Pixel FX</h2>
+    <div class="add-grid">
       <button class="add-pix" data-add="pixelsort"><span class="ic">▰</span><span>Pixel sort</span><span class="kind">pixel fx</span></button>
       <button class="add-pix" data-add="rgbshift"><span class="ic">≬</span><span>RGB shift</span><span class="kind">pixel fx</span></button>
+      <button class="add-pix" data-add="databend"><span class="ic">⌗</span><span>Databend</span><span class="kind">pixel fx</span></button>
+      <button class="add-pix" data-add="qpboost"><span class="ic">▦</span><span>QP boost</span><span class="kind">pixel fx</span></button>
+      <button class="add-pix" data-add="posterize" style="grid-column:1/3"><span class="ic">◍</span><span>Posterize + Dither</span><span class="kind">pixel fx</span></button>
+    </div>
+    <h2 style="margin-top:10px">Bitstream</h2>
+    <div class="add-grid">
       <button class="add-bit" data-add="melt"><span class="ic">∇</span><span>Melt</span><span class="kind">bitstream</span></button>
       <button class="add-bit" data-add="bloom"><span class="ic">✦</span><span>Bloom</span><span class="kind">bitstream</span></button>
-      <button class="add-bit" data-add="corrupt" style="grid-column:1/3"><span class="ic">⌇</span><span>Corrupt</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="corrupt"><span class="ic">⌇</span><span>Corrupt</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="reorder"><span class="ic">⇄</span><span>Reorder</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="smear"><span class="ic">▒</span><span>Smear</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="drop"><span class="ic">⋮</span><span>Drop%</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="reverse"><span class="ic">↺</span><span>Reverse</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="stutter"><span class="ic">▤</span><span>Stutter</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="crossmix"><span class="ic">⊞</span><span>Cross-mix</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="keyinject"><span class="ic">⬛</span><span>Key inject</span><span class="kind">bitstream</span></button>
+    </div>
+    <h2 style="margin-top:10px">Slice-level <span class="hint" style="font-size:9px">(aviso: pode abortar decode em GPU fraca)</span></h2>
+    <div class="add-grid">
+      <button class="add-bit" data-add="slicedrop"><span class="ic">⌐</span><span>Slice drop</span><span class="kind">slice</span></button>
+      <button class="add-bit" data-add="slicehdr"><span class="ic">⌙</span><span>Slice hdr</span><span class="kind">slice</span></button>
+      <button class="add-bit" data-add="mblock" style="grid-column:1/3"><span class="ic">▣</span><span>MBlock swap</span><span class="kind">slice</span></button>
     </div>
     <div class="hint" style="margin-top:8px">Fontes produzem pixels. Pixel-fx filtram o composto na posição da pilha. Bitstream-fx atuam pós-encode, em ordem da pilha.</div>
 
@@ -233,11 +259,27 @@ function makeLayer(type){
   switch(type){
     case "video":      return { ...base, kind:"src",      name:"Vídeo",      file:null, src:null, regionOffset:0, ...xform };
     case "image":      return { ...base, kind:"src",      name:"Imagem",     file:null, bitmap:null, ...xform };
+    // === BITSTREAM (atuam pós-encode) ===
     case "melt":       return { ...base, kind:"bitstream",name:"Melt",       cutFrames:"auto" };
     case "bloom":      return { ...base, kind:"bitstream",name:"Bloom",      targetFrame:10, count:20, window:4 };
     case "corrupt":    return { ...base, kind:"bitstream",name:"Corrupt",    count:3, intensity:40 };
+    case "reorder":    return { ...base, kind:"bitstream",name:"Reorder",    amount:50, seed:1 };
+    case "smear":      return { ...base, kind:"bitstream",name:"Smear",      freezeAt:10, count:30 };
+    case "drop":       return { ...base, kind:"bitstream",name:"Drop%",      percent:20, seed:1 };
+    case "reverse":    return { ...base, kind:"bitstream",name:"Reverse",    fromFrame:0, toFrame:0 };
+    case "stutter":    return { ...base, kind:"bitstream",name:"Stutter",    windowSize:3, pattern:"3,1,2,1" };
+    case "crossmix":   return { ...base, kind:"bitstream",name:"Cross-mix",  fromFrame:0, count:15, sourceIdx:1 };
+    case "keyinject":  return { ...base, kind:"bitstream",name:"Key inject", atFrame:10 };
+    // === SLICE-LEVEL (best-effort com NAL parsing — pode abortar decode em GPU fraca) ===
+    case "slicedrop":  return { ...base, kind:"bitstream",name:"Slice drop", count:3, intensity:40 };
+    case "slicehdr":   return { ...base, kind:"bitstream",name:"Slice hdr",  count:3, intensity:50 };
+    case "mblock":     return { ...base, kind:"bitstream",name:"MBlock swap",count:3, intensity:50 };
+    // === PIXEL-LEVEL (atuam em ImageData, sem bitstream) ===
     case "pixelsort":  return { ...base, kind:"pixelfx",  name:"Pixel sort", dir:"h", criterion:"luma", min:60, max:200 };
     case "rgbshift":   return { ...base, kind:"pixelfx",  name:"RGB shift",  angle:0, amount:8 };
+    case "databend":   return { ...base, kind:"pixelfx",  name:"Databend",   amount:30, seed:1, mode:"xor" };
+    case "qpboost":    return { ...base, kind:"pixelfx",  name:"QP boost",   qp:45, frames:5 };
+    case "posterize":  return { ...base, kind:"pixelfx",  name:"Posterize",  levels:4, dither:30 };
   }
 }
 
@@ -358,6 +400,342 @@ function applyCorrupt(chunks, count, intensity01, rng){
   return { chunks: out, affected: [...chosen], stride };
 }
 
+/* ============================================================
+   NOVOS EFEITOS BITSTREAM — todos manipulam chunks[] como applyMelt/Bloom/Corrupt
+   ============================================================ */
+
+/** REORDER: reorganiza P-frames em blocos pequenos para criar movimento "rebobinado".
+ *  Implementação anterior (permutação aleatória completa) quebrava demais o frame_num do
+ *  H.264 — software decoder abortava em ~5/12 frames. Nova abordagem: divide os chunks
+ *  delta em janelas de 2-4 e INVERTE a ordem dentro de cada janela (mantém coerência
+ *  temporal local). O decoder aguenta muito melhor e o efeito visual é o mesmo "rewind"
+ *  errático que caracteriza o reorder de datamosh.
+ *  amount (0..100) = quantas janelas são invertidas (0 = nenhuma, 100 = todas). */
+function applyReorder(chunks, amount01, rng){
+  if (amount01 <= 0) return { chunks, permuted: 0 };
+  if (chunks.length <= 3) return { chunks, permuted: 0 };
+  const out = chunks.slice();
+  // coleta índices delta (ignora o 1º que é key)
+  const deltaIdxs = [];
+  for (let i = 1; i < out.length; i++) if (out[i].type === "delta") deltaIdxs.push(i);
+  if (deltaIdxs.length < 4) return { chunks, permuted: 0 };
+
+  // divide os delta em janelas de tamanho 2-4 (alternado pelo rng pra variar)
+  const windows = [];
+  let i = 0;
+  while (i < deltaIdxs.length){
+    const winSize = 2 + Math.floor(rng() * 3); // 2, 3 ou 4
+    const win = deltaIdxs.slice(i, i + winSize);
+    if (win.length >= 2) windows.push(win);
+    i += winSize;
+  }
+  // seleciona N% das janelas pra inverter (baseado no amount)
+  const n = Math.max(1, Math.round(windows.length * amount01));
+  const chosenWindows = windows.slice().sort(() => rng() - 0.5).slice(0, n);
+
+  let permuted = 0;
+  for (const win of chosenWindows){
+    // inverte a ordem dos chunks dentro da janela
+    const reversedChunks = win.map(idx => out[idx]).reverse();
+    win.forEach((idx, k) => {
+      out[idx] = { ...reversedChunks[k], data: reversedChunks[k].data.slice() };
+      permuted++;
+    });
+  }
+  return { chunks: out, permuted };
+}
+
+/** SMEAR: substitui TODOS os chunks delta após um ponto por UM único chunk replicado.
+ *  Diferente do bloom (que cicla janela), smear congela num delta só → "TV quebrada congelada".
+ *  freezeAt = índice do frame onde congela; count = quantas repetições. */
+function applySmear(chunks, freezeAt, count, fps){
+  if (count <= 0) return { chunks, frozenAt: -1 };
+  let idx = clamp(freezeAt, 1, chunks.length - 1);
+  // procura o chunk delta mais próximo de freezeAt
+  let probe = idx, dir = 1, tries = 0;
+  while (chunks[probe] && chunks[probe].type !== "delta" && tries < chunks.length){
+    probe += dir; if (probe < 0 || probe >= chunks.length){ dir = -dir; probe = idx; }
+    tries++;
+  }
+  idx = clamp(probe, 1, chunks.length - 1);
+  const frozen = { ...chunks[idx], data: chunks[idx].data.slice() };
+  // substitui os próximos `count` chunks por réplicas do frozen
+  const out = chunks.slice(0, idx + 1);
+  for (let k = 0; k < count; k++){
+    out.push({ ...frozen, data: frozen.data.slice() });
+  }
+  // mantém o resto do stream original após o smear (se houver)
+  for (let k = idx + 1; k < chunks.length; k++) out.push(chunks[k]);
+  // retimestampa
+  const ts = (i) => Math.round(i * 1e6 / fps);
+  return { chunks: out.map((c, i) => ({ ...c, timestamp: ts(i) })), frozenAt: idx };
+}
+
+/** DROP%: drop aleatório de N% dos chunks delta. Causa stutter + drift acumulado. */
+function applyDrop(chunks, percent01, rng){
+  if (percent01 <= 0) return { chunks, dropped: 0 };
+  const out = [];
+  let dropped = 0;
+  for (let i = 0; i < chunks.length; i++){
+    const c = chunks[i];
+    // nunca dropa keyframes (índice 0 ou type=key) — senão o decoder não inicia
+    if (i > 0 && c.type === "delta" && rng() < percent01){
+      dropped++;
+      continue;
+    }
+    out.push(c);
+  }
+  return { chunks: out, dropped };
+}
+
+/** REVERSE: inverte a ordem dos chunks delta entre fromFrame e toFrame.
+ *  Movimento vai pra trás + drift acumulado → bizarro rewind com artefato. */
+function applyReverse(chunks, fromFrame, toFrame, fps){
+  if (chunks.length <= 2) return { chunks, reversed: 0 };
+  let from = clamp(fromFrame, 1, chunks.length - 1);
+  let to = toFrame <= 0 ? chunks.length - 1 : clamp(toFrame, from + 1, chunks.length - 1);
+  const out = chunks.slice();
+  const segment = out.slice(from, to + 1).reverse();
+  for (let i = 0; i < segment.length; i++) out[from + i] = segment[i];
+  // retimestampa
+  const ts = (i) => Math.round(i * 1e6 / fps);
+  return { chunks: out.map((c, i) => ({ ...c, timestamp: ts(i) })), reversed: segment.length };
+}
+
+/** STUTTER: pega uma janela pequena e repete em ritmo (3 reps → 1 novo → 3 reps...).
+ *  pattern é string tipo "3,1,2,1" — quantas reps de cada chunk antes de avançar.
+ *  windowSize = quantos chunks consecutivos formam a "janela" a ser cicladada. */
+function applyStutter(chunks, windowSize, patternStr, fps){
+  if (chunks.length <= 2 || windowSize < 1) return { chunks, cycles: 0 };
+  const pattern = (patternStr || "3,1,2,1").split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+  if (pattern.length === 0) return { chunks, cycles: 0 };
+  // pega a janela a partir de ~1/3 do stream (meio-termo — tem histórico e futuro)
+  const start = Math.max(1, Math.floor(chunks.length / 3));
+  const win = chunks.slice(start, start + windowSize).map(c => ({ ...c, data: c.data.slice() }));
+  if (win.length === 0) return { chunks, cycles: 0 };
+  // expande a janela pelo pattern até cobrir o resto do stream
+  const tail = [];
+  let cycles = 0;
+  let pos = start;
+  while (pos < chunks.length){
+    const reps = pattern[cycles % pattern.length];
+    const chunk = win[cycles % win.length];
+    for (let r = 0; r < reps && pos < chunks.length; r++){
+      tail.push({ ...chunk, data: chunk.data.slice() });
+      pos++;
+    }
+    cycles++;
+  }
+  const out = chunks.slice(0, start).concat(tail);
+  const ts = (i) => Math.round(i * 1e6 / fps);
+  return { chunks: out.map((c, i) => ({ ...c, timestamp: ts(i) })), cycles };
+}
+
+/** CROSS-MIX: splica chunks de uma segunda fonte (chunks2) no stream atual.
+ *  fromFrame = onde começa a splicar; count = quantos chunks da 2ª fonte.
+ *  sourceIdx = índice da camada src (no painel) que fornece os chunks da 2ª fonte.
+ *  NOTA: o caller precisa passar `chunks2` (já codificado da outra fonte). */
+function applyCrossMix(chunks, chunks2, fromFrame, count, fps){
+  if (!chunks2 || chunks2.length === 0 || count <= 0) return { chunks, spliced: 0 };
+  const from = clamp(fromFrame, 1, chunks.length - 1);
+  const n = Math.min(count, chunks2.length - 1);
+  const spliced = chunks2.slice(1, 1 + n).map(c => ({ ...c, data: c.data.slice() }));
+  const out = chunks.slice(0, from).concat(spliced).concat(chunks.slice(from));
+  const ts = (i) => Math.round(i * 1e6 / fps);
+  return { chunks: out.map((c, i) => ({ ...c, timestamp: ts(i) })), spliced: n };
+}
+
+/** KEY INJECT: força um keyframe no meio do stream (em atFrame).
+ *  O decoder resincroniza — efeito "flash/reset parcial" no meio do mosh. */
+function applyKeyInject(chunks, atFrame){
+  if (chunks.length <= 2) return { chunks, injected: false };
+  const idx = clamp(atFrame, 1, chunks.length - 1);
+  // pega o keyframe do início e replica no atFrame (com timestamp do chunk que estava lá)
+  const keyChunk = chunks[0];
+  const targetTs = chunks[idx].timestamp;
+  const targetDur = chunks[idx].duration;
+  const injected = { type: "key", timestamp: targetTs, duration: targetDur, data: keyChunk.data.slice() };
+  const out = chunks.slice();
+  out[idx] = injected;
+  return { chunks: out, injected: true, atFrame: idx };
+}
+
+/* ============================================================
+   EFEITOS SLICE-LEVEL (best-effort com NAL parsing)
+   Parse minimal de NAL units — identifica start codes (00 00 01 ou 00 00 00 01)
+   e tipos de NAL (NAL header byte). Para H.264 baseline, slice non-IDR = NAL type 1,
+   slice IDR = NAL type 5. Estes efeitos são CIRÚRGICOS mas podem abortar decode
+   em GPU fraca — usar com cuidado.
+   ============================================================ */
+
+/** Encontra os NAL units dentro de um chunk.
+ *  Suporta DOIS formatos:
+ *  - AVCC (length-prefixed): 4 bytes big-endian de tamanho + NAL header byte. Padrão do WebCodecs
+ *    quando avc.format="avc". Cada chunk pode conter múltiplos NALs concatenados.
+ *  - Annex-B (start codes): 00 00 01 ou 00 00 00 01 + NAL header byte. Detectado se houver
+ *    start code em algum lugar do chunk.
+ *  Retorna array de { start, nalType, hdrOffset, end } — start = offset do início do NAL
+ *  (incluindo prefixo), hdrOffset = offset do byte de header do NAL, end = offset do próximo NAL. */
+function findNalUnits(data){
+  const nals = [];
+  // Detecta formato: se achar um start code (00 00 01) nos primeiros 32 bytes, é Annex-B.
+  // Senão, assume AVCC e lê length-prefix.
+  let isAnnexB = false;
+  const probeLen = Math.min(data.length, 32);
+  for (let i = 0; i < probeLen - 2; i++){
+    if (data[i] === 0 && data[i+1] === 0 && data[i+2] === 1){
+      isAnnexB = true; break;
+    }
+  }
+  if (isAnnexB){
+    let i = 0;
+    while (i < data.length - 3){
+      let scLen = 0, hdrOff = 0;
+      if (data[i] === 0 && data[i+1] === 0 && data[i+2] === 0 && data[i+3] === 1){
+        scLen = 4; hdrOff = i + 4;
+      } else if (data[i] === 0 && data[i+1] === 0 && data[i+2] === 1){
+        scLen = 3; hdrOff = i + 3;
+      } else { i++; continue; }
+      const nalType = data[hdrOff] & 0x1f;
+      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: data.length });
+      if (nals.length > 1) nals[nals.length - 2].end = i;
+      i = hdrOff + 1;
+    }
+  } else {
+    // AVCC: length-prefixed. 4 bytes de tamanho + NAL. Itera até acabar.
+    let i = 0;
+    while (i + 4 <= data.length){
+      const len = (data[i] << 24) | (data[i+1] << 16) | (data[i+2] << 8) | data[i+3];
+      if (len <= 0 || i + 4 + len > data.length) break; // tamanho inválido — aborta
+      const hdrOff = i + 4;
+      const nalType = data[hdrOff] & 0x1f;
+      nals.push({ start: i, nalType, hdrOffset: hdrOff, end: i + 4 + len });
+      i = i + 4 + len;
+    }
+  }
+  return nals;
+}
+
+/** SLICE DROP: dropa NAL units de slice (type 1) dentro de N chunks delta.
+ *  Causa "torn horizontal" — metade do frame OK, metade derreteu. */
+function applySliceDrop(chunks, count, intensity01, rng){
+  if (intensity01 <= 0) return { chunks, affected: [], droppedNals: 0 };
+  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
+  if (deltaIdxs.length === 0) return { chunks, affected: [], droppedNals: 0 };
+  const chosen = new Set();
+  let guard = 0;
+  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
+    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
+    guard++;
+  }
+  let droppedNals = 0;
+  const dropRatio = 0.3 + intensity01 * 0.5; // 30-80% dos slices dropados por chunk
+  const out = chunks.map((c, i) => {
+    if (!chosen.has(i)) return c;
+    const nals = findNalUnits(c.data);
+    if (nals.length === 0) return c;
+    // identificação de slice: type 1 (non-IDR) ou type 5 (IDR) — dropa só type 1
+    const dropSet = new Set();
+    for (const n of nals){
+      if (n.nalType === 1 && rng() < dropRatio){
+        dropSet.add(n.start);
+        droppedNals++;
+      }
+    }
+    if (dropSet.size === 0) return c;
+    // reconstrói o buffer sem os NALs dropados (preserva prefixo de cada NAL restante)
+    const pieces = [];
+    let cursor = 0;
+    for (const n of nals){
+      if (dropSet.has(n.start)){
+        // preserva bytes antes do NAL dropado
+        if (cursor < n.start) pieces.push(c.data.subarray(cursor, n.start));
+        cursor = n.end;
+      }
+    }
+    if (cursor < c.data.length) pieces.push(c.data.subarray(cursor));
+    const newLen = pieces.reduce((s, p) => s + p.length, 0);
+    const d = new Uint8Array(newLen);
+    let off = 0;
+    for (const p of pieces){ d.set(p, off); off += p.length; }
+    return { ...c, data: d };
+  });
+  return { chunks: out, affected: [...chosen], droppedNals };
+}
+
+/** SLICE HDR CORRUPT: corrompe bytes específicos do slice header (após o NAL header byte).
+ *  Slice header começa logo após o NAL header (1 byte) e contém: first_mb_in_slice,
+ *  slice_type, frame_num (Exp-Golomb). XOR nos primeiros ~6 bytes após o header
+ *  afeta esses campos — decoder reaplica frames errados. */
+function applySliceHdrCorrupt(chunks, count, intensity01, rng){
+  if (intensity01 <= 0) return { chunks, affected: [], corruptedNals: 0 };
+  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
+  if (deltaIdxs.length === 0) return { chunks, affected: [], corruptedNals: 0 };
+  const chosen = new Set();
+  let guard = 0;
+  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
+    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
+    guard++;
+  }
+  let corruptedNals = 0;
+  const xorVal = 0x40 + Math.round(intensity01 * 0x80);
+  const out = chunks.map((c, i) => {
+    if (!chosen.has(i)) return c;
+    const nals = findNalUnits(c.data);
+    if (nals.length === 0) return c;
+    const d = new Uint8Array(c.data);
+    for (const n of nals){
+      if (n.nalType !== 1) continue; // só slice non-IDR
+      // slice header começa em n.hdrOffset + 1 (após o NAL header byte)
+      // corrompe os primeiros ~6 bytes do slice header (Exp-Golomb: first_mb, slice_type, frame_num)
+      const start = n.hdrOffset + 1;
+      for (let k = 0; k < 6 && start + k < d.length; k++){
+        d[start + k] ^= xorVal;
+      }
+      corruptedNals++;
+    }
+    return { ...c, data: d };
+  });
+  return { chunks: out, affected: [...chosen], corruptedNals };
+}
+
+/** MBLOCK SWAP: corrompe bytes profundos no slice DATA (após header) — afeta
+ *  codificação de macroblocks. Causa "block mosaic" aleatório. Best-effort: sem
+ *  parser Exp-Golomb completo, faz XOR em padrões regulares profundos no slice. */
+function applyMBlockSwap(chunks, count, intensity01, rng){
+  if (intensity01 <= 0) return { chunks, affected: [], corruptedMbs: 0 };
+  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
+  if (deltaIdxs.length === 0) return { chunks, affected: [], corruptedMbs: 0 };
+  const chosen = new Set();
+  let guard = 0;
+  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
+    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
+    guard++;
+  }
+  let corruptedMbs = 0;
+  const xorVal = 0x80 + Math.round(intensity01 * 0x7F);
+  // stride menor que corrupt (mais denso) — afeta mais macroblocks
+  const stride = Math.round(8 - intensity01 * 5); // 3..8
+  const out = chunks.map((c, i) => {
+    if (!chosen.has(i)) return c;
+    const nals = findNalUnits(c.data);
+    if (nals.length === 0) return c;
+    const d = new Uint8Array(c.data);
+    for (const n of nals){
+      if (n.nalType !== 1) continue;
+      // slice data começa ~após 8-10 bytes do header (first_mb + slice_type + frame_num + pic_order_cnt)
+      // XOR a partir do offset 12 dentro do NAL, stride denso
+      const sliceDataStart = n.hdrOffset + 12;
+      for (let k = sliceDataStart; k < d.length; k += stride){
+        d[k] ^= xorVal;
+        corruptedMbs++;
+      }
+    }
+    return { ...c, data: d };
+  });
+  return { chunks: out, affected: [...chosen], corruptedMbs };
+}
+
 function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError){
   let errored = false;
   let decodedCount = 0;
@@ -365,11 +743,17 @@ function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError
     output: (vf) => { decodedCount++; onFrame(vf); },
     error: (e) => { errored = true; onError && onError(e.message, decodedCount); }
   });
-  dec.configure({
-    codec: CODEC, codedWidth: w, codedHeight: h,
-    description: decoderDescription,
-    hardwareAcceleration: "prefer-hardware"
-  });
+  // Caminho validado no protótipo original: uma única configuração de decoder.
+  // Não fazer fallback silencioso para software: além de esconder o erro real,
+  // o decoder de software costuma rejeitar streams moshados que o hardware tolera.
+  try {
+    dec.configure({ codec: CODEC, codedWidth: w, codedHeight: h, description: decoderDescription, hardwareAcceleration: "prefer-hardware" });
+  } catch(e){
+    errored = true;
+    onError && onError("configure: " + e.message, 0);
+    onDone && onDone(0, true);
+    return;
+  }
   (async () => {
     for (let i = 0; i < chunks.length; i++){
       if (errored) break;
@@ -484,6 +868,137 @@ function rgbShift(imgData, w, h, angleDeg, amount){
 }
 
 /* ============================================================
+   NOVOS EFEITOS PIXEL-LEVEL — manipulam ImageData direto (sem bitstream)
+   ============================================================ */
+
+/** DATABEND: trata a ImageData como bytes brutos e XOR/shift em padrões regulares.
+ *  Causa "blocos de cor deslocados horizontalmente" — glitch clássico de databend.
+ *  Menos autêntico que o corrupt (que ataca o stream codificado), mas mais rápido.
+ *  mode: "xor" (XOR esparso) | "shift" (desloca bytes) | "swap" (troca blocos) */
+function databendRaw(imgData, w, h, amount01, seed, mode){
+  if (amount01 <= 0) return;
+  const d = imgData.data;
+  const rng = mulberry32(hashInt(String(seed) + "databend"));
+  // número de "ataques" proporcional ao amount (até ~200 ataques em amount=1)
+  const n = Math.round(amount01 * 200);
+  if (mode === "xor"){
+    // XOR esparso em bytes aleatórios
+    for (let k = 0; k < n; k++){
+      const i = Math.floor(rng() * d.length);
+      const xorVal = 0x40 + Math.floor(rng() * 0xC0);
+      d[i] ^= xorVal;
+    }
+  } else if (mode === "shift"){
+    // desloca um bloco horizontal de pixels para outra posição
+    for (let k = 0; k < n; k++){
+      const y1 = Math.floor(rng() * h);
+      const y2 = Math.floor(rng() * h);
+      const xShift = Math.floor((rng() - 0.5) * w * 0.3);
+      const rowStart1 = y1 * w * 4;
+      const rowStart2 = y2 * w * 4;
+      // copia uma janela de y1 deslocada para y2
+      const winStart = Math.floor(rng() * (w - 20));
+      const winLen = 5 + Math.floor(rng() * 30);
+      for (let x = 0; x < winLen; x++){
+        const sx = (winStart + x) % w;
+        const dx = ((winStart + x + xShift) % w + w) % w;
+        const si = rowStart1 + sx * 4;
+        const di = rowStart2 + dx * 4;
+        d[di] = d[si]; d[di+1] = d[si+1]; d[di+2] = d[si+2]; d[di+3] = d[si+3];
+      }
+    }
+  } else if (mode === "swap"){
+    // troca dois blocos retangulares de lugar
+    for (let k = 0; k < n; k++){
+      const bw = 4 + Math.floor(rng() * 16);
+      const bh = 4 + Math.floor(rng() * 16);
+      const x1 = Math.floor(rng() * (w - bw));
+      const y1 = Math.floor(rng() * (h - bh));
+      const x2 = Math.floor(rng() * (w - bw));
+      const y2 = Math.floor(rng() * (h - bh));
+      for (let yy = 0; yy < bh; yy++){
+        for (let xx = 0; xx < bw; xx++){
+          const i1 = ((y1+yy) * w + (x1+xx)) * 4;
+          const i2 = ((y2+yy) * w + (x2+xx)) * 4;
+          const r=d[i1], g=d[i1+1], b=d[i1+2], a=d[i1+3];
+          d[i1]=d[i2]; d[i1+1]=d[i2+1]; d[i1+2]=d[i2+2]; d[i1+3]=d[i2+3];
+          d[i2]=r; d[i2+1]=g; d[i2+2]=b; d[i2+3]=a;
+        }
+      }
+    }
+  }
+}
+
+/** POSTERIZE + DITHER: reduz o número de níveis de cor por canal + dithering Floyd-Steinberg.
+ *  Não é mosh real, mas combina visualmente com mosh pra estética 8-bit. */
+function posterizeDither(imgData, w, h, levels, ditherAmount01){
+  const d = imgData.data;
+  const steps = Math.max(2, Math.round(levels));
+  const stepSize = 255 / (steps - 1);
+  if (ditherAmount01 > 0){
+    // Floyd-Steinberg com amount controlando a força do erro propagado
+    const propagate = ditherAmount01;
+    for (let y = 0; y < h; y++){
+      for (let x = 0; x < w; x++){
+        const i = (y*w+x)*4;
+        for (let c = 0; c < 3; c++){
+          const old = d[i+c];
+          const newVal = Math.round(Math.round(old / stepSize) * stepSize);
+          const err = (old - newVal) * propagate;
+          d[i+c] = clamp(newVal, 0, 255);
+          // propaga erro
+          if (x + 1 < w) d[i+4+c] += err * 7/16;
+          if (y + 1 < h){
+            if (x > 0) d[i + (w*4 - 4) + c] += err * 3/16;
+            d[i + (w*4) + c] += err * 5/16;
+            if (x + 1 < w) d[i + (w*4 + 4) + c] += err * 1/16;
+          }
+        }
+      }
+    }
+  } else {
+    // posterize simples sem dither
+    for (let i = 0; i < d.length; i += 4){
+      d[i]   = Math.round(Math.round(d[i]   / stepSize) * stepSize);
+      d[i+1] = Math.round(Math.round(d[i+1] / stepSize) * stepSize);
+      d[i+2] = Math.round(Math.round(d[i+2] / stepSize) * stepSize);
+    }
+  }
+}
+
+/* QP BOOST: força blocking artifacts massivos re-codificando N frames com QP alto.
+ *  Este efeito é assíncrono (precisa do VideoEncoder) e atua em ImageData — na prática,
+ *  ele re-codifica cada frame afetado como JPEG-like e volta pra ImageData. Para manter
+ *  o pipeline síncrono (renderFrame é async mas QP-boost não pode instanciar encoder aqui),
+ *  implementamos uma SIMULAÇÃO visual de blocking: quantiza pixels em blocos 8x8 com a cor
+ *  média do bloco + ruído controlado pelo QP. Dá o efeito visual sem re-codificar. */
+function qpBoostSim(imgData, w, h, qp, framesAffected){
+  // QP 1-51 (H.264 range). QP alto = mais blocking. Convertemos para tamanho de bloco:
+  // qp=10 → bloco 2x2 (quase sem perda), qp=51 → bloco 16x16 (destruído).
+  const blockSize = Math.max(2, Math.round(2 + (qp / 51) * 14));
+  const d = imgData.data;
+  // quantiza cada bloco blockSize×blockSize para a cor MÉDIA do bloco
+  for (let by = 0; by < h; by += blockSize){
+    for (let bx = 0; bx < w; bx += blockSize){
+      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      for (let y = by; y < Math.min(by + blockSize, h); y++){
+        for (let x = bx; x < Math.min(bx + blockSize, w); x++){
+          const i = (y*w+x)*4;
+          r += d[i]; g += d[i+1]; b += d[i+2]; a += d[i+3]; n++;
+        }
+      }
+      r = Math.round(r/n); g = Math.round(g/n); b = Math.round(b/n); a = Math.round(a/n);
+      for (let y = by; y < Math.min(by + blockSize, h); y++){
+        for (let x = bx; x < Math.min(bx + blockSize, w); x++){
+          const i = (y*w+x)*4;
+          d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = a;
+        }
+      }
+    }
+  }
+}
+
+/* ============================================================
    COMPOSIÇÃO DE FRAMES (Etapa 1)
    ============================================================
    - src layers: renderizam para um canvas próprio; são compostas com blend/opacity/clip
@@ -496,14 +1011,29 @@ function rgbShift(imgData, w, h, angleDeg, amount){
    depois efeitos (acima) transformam o resultado acumulado.
    - src layers: desenham no canvas com blend/opacity/clip
    - pixel-fx layers: filtram o composto ATUAL (resultado de tudo que está abaixo no painel)
-   - bitstream-fx layers: PULADAS aqui (atuam depois do encode) */
-async function renderFrame(i, ctx, w, h, total){
-  ctx.clearRect(0, 0, w, h);
+   - bitstream-fx layers: PULADAS aqui (atuam depois do encode)
+
+   Parâmetros opcionais (opts):
+   - fromIdx/toIdx: range INCLUSIVO de índices da pilha a renderizar
+     (default: toda a pilha). Usado pelo scoping de bitstream: o encode
+     passa fromIdx=moshIdx para codificar só o grupo "abaixo"; a composição
+     "acima" passa toIdx=moshIdx-1 para compor só o grupo "acima" sobre o
+     frame decodificado.
+   - clear: se false, NÃO faz clearRect no início (preserva o que já está
+     no canvas — usado para compor o grupo "acima" sobre o frame moshado). */
+async function renderFrame(i, ctx, w, h, total, opts){
+  opts = opts || {};
+  const fromIdx = opts.fromIdx != null ? opts.fromIdx : 0;
+  const toIdx = opts.toIdx != null ? opts.toIdx : project.stack.length - 1;
+  const clear = opts.clear !== false; // default true
+  if (clear){
+    ctx.clearRect(0, 0, w, h);
+  }
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
 
   // bottom-up: último índice (base do painel) primeiro, índice 0 (topo) por último
-  for (let li = project.stack.length - 1; li >= 0; li--){
+  for (let li = toIdx; li >= fromIdx; li--){
     const layer = project.stack[li];
     if (!layer.enabled) continue;
     if (layer.kind === "bitstream") continue; // não renderiza por frame
@@ -515,6 +1045,12 @@ async function renderFrame(i, ctx, w, h, total){
         pixelSort(snapshot, w, h, { dir: layer.dir, criterion: layer.criterion, min: +layer.min, max: +layer.max });
       } else if (layer.type === "rgbshift"){
         rgbShift(snapshot, w, h, +layer.angle, +layer.amount);
+      } else if (layer.type === "databend"){
+        databendRaw(snapshot, w, h, (+layer.amount)/100, +layer.seed, layer.mode);
+      } else if (layer.type === "posterize"){
+        posterizeDither(snapshot, w, h, +layer.levels, (+layer.dither)/100);
+      } else if (layer.type === "qpboost"){
+        qpBoostSim(snapshot, w, h, +layer.qp, +layer.frames);
       }
       // Se opacity < 1, mescla o original com o filtrado
       if (layer.opacity < 1){
@@ -628,9 +1164,124 @@ function applyBitstreamLayers(chunks, fps, rng){
       const r = applyCorrupt(working, +layer.count, (+layer.intensity)/100, rng);
       working = r.chunks;
       notes.push(`corrupt(${r.affected.length} frames, stride ${r.stride})`);
+    } else if (layer.type === "reorder"){
+      const layerRng = mulberry32(hashInt(String(layer.seed) + "reorder"));
+      const r = applyReorder(working, (+layer.amount)/100, layerRng);
+      working = r.chunks;
+      notes.push(`reorder(${r.permuted} chunks)`);
+    } else if (layer.type === "smear"){
+      const r = applySmear(working, +layer.freezeAt, +layer.count, fps);
+      working = r.chunks;
+      notes.push(`smear(@${r.frozenAt}×${layer.count})`);
+    } else if (layer.type === "drop"){
+      const layerRng = mulberry32(hashInt(String(layer.seed) + "drop"));
+      const r = applyDrop(working, (+layer.percent)/100, layerRng);
+      working = r.chunks;
+      notes.push(`drop(${r.dropped} chunks)`);
+    } else if (layer.type === "reverse"){
+      const r = applyReverse(working, +layer.fromFrame, +layer.toFrame, fps);
+      working = r.chunks;
+      notes.push(`reverse(${r.reversed} chunks)`);
+    } else if (layer.type === "stutter"){
+      const r = applyStutter(working, +layer.windowSize, layer.pattern, fps);
+      working = r.chunks;
+      notes.push(`stutter(win ${layer.windowSize}, ${r.cycles} cycles)`);
+    } else if (layer.type === "crossmix"){
+      // crossmix precisa dos chunks de outra fonte src — busca a N-ésima src layer abaixo desta
+      const chunks2 = getCrossMixSourceChunks(layer, li);
+      if (chunks2){
+        const r = applyCrossMix(working, chunks2, +layer.fromFrame, +layer.count, fps);
+        working = r.chunks;
+        notes.push(`crossmix(${r.spliced} chunks)`);
+      } else {
+        notes.push(`crossmix: sem 2ª fonte — pulou`);
+      }
+    } else if (layer.type === "keyinject"){
+      const r = applyKeyInject(working, +layer.atFrame);
+      working = r.chunks;
+      notes.push(`keyinject(@${r.atFrame})`);
+    } else if (layer.type === "slicedrop"){
+      const r = applySliceDrop(working, +layer.count, (+layer.intensity)/100, rng);
+      working = r.chunks;
+      notes.push(`slicedrop(${r.droppedNals} NALs)`);
+    } else if (layer.type === "slicehdr"){
+      const r = applySliceHdrCorrupt(working, +layer.count, (+layer.intensity)/100, rng);
+      working = r.chunks;
+      notes.push(`slicehdr(${r.corruptedNals} NALs)`);
+    } else if (layer.type === "mblock"){
+      const r = applyMBlockSwap(working, +layer.count, (+layer.intensity)/100, rng);
+      working = r.chunks;
+      notes.push(`mblock(${r.corruptedMbs} bytes)`);
     }
   }
   return { chunks: working, notes };
+}
+
+/** Para o crossmix: encontra a N-ésima camada src ABAIXO da crossmix layer (no painel),
+ *  codifica seus frames e retorna os chunks. Cacheia por assinatura pra não re-codificar
+ *  a cada applyAll. sourceIdx=1 = primeira src abaixo; 2 = segunda; etc. */
+const _crossMixCache = new Map();
+function getCrossMixSourceChunks(crossMixLayer, crossMixIdx){
+  // coleta src layers abaixo desta no painel (índices > crossMixIdx)
+  const srcsBelow = [];
+  for (let i = crossMixIdx + 1; i < project.stack.length; i++){
+    const l = project.stack[i];
+    if (l.kind === "src" && l.enabled && (l.src || l.bitmap)) srcsBelow.push(l);
+  }
+  const idx = clamp(+crossMixLayer.sourceIdx, 1, srcsBelow.length) - 1;
+  const src = srcsBelow[idx];
+  if (!src) return null;
+  // assinatura simples da fonte — tipo + id + região (se vídeo)
+  const sig = [src.id, src.type, src.regionOffset || 0, project.width, project.height, project.fps, project.duration].join("§");
+  if (_crossMixCache.has(sig)) return _crossMixCache.get(sig).chunks;
+  // codifica de forma síncrona — retorna null se falhar (caller pula)
+  // NOTA: esta função é chamada dentro de applyBitstreamLayers que é síncrona, então
+  // não podemos fazer async aqui. Crossmix só funciona se a 2ª fonte já estiver no cache.
+  // Workaround: pré-codificamos a 2ª fonte no applyAll ANTES de chamar applyBitstreamLayers.
+  return null;
+}
+
+/** Pré-codifica todas as fontes src abaixo de cada crossmix layer, em paralelo,
+ *  populando o cache. Chamada pelo applyAll ANTES de applyBitstreamLayers. */
+async function preEncodeCrossMixSources(total){
+  const tasks = [];
+  for (let li = 0; li < project.stack.length; li++){
+    const layer = project.stack[li];
+    if (layer.type !== "crossmix" || !layer.enabled) continue;
+    // coleta srcs abaixo desta crossmix
+    const srcsBelow = [];
+    for (let i = li + 1; i < project.stack.length; i++){
+      const l = project.stack[i];
+      if (l.kind === "src" && l.enabled && (l.src || l.bitmap)) srcsBelow.push(l);
+    }
+    const idx = clamp(+layer.sourceIdx, 1, srcsBelow.length) - 1;
+    const src = srcsBelow[idx];
+    if (!src) continue;
+    const sig = [src.id, src.type, src.regionOffset || 0, project.width, project.height, project.fps, project.duration].join("§");
+    if (_crossMixCache.has(sig)) continue;
+    tasks.push((async () => {
+      try {
+        const keySet = new Set([0]);
+        const drawFrame = async (i, ctx, w, h) => {
+          // desenha SÓ esta src (ignora outras camadas — é um stream separado)
+          ctx.clearRect(0, 0, w, h);
+          if (src.type === "video" && src.src){
+            const t = (src.regionOffset || 0) + (i / Math.max(1, total-1)) * project.duration;
+            const fc = await src.src.getFrameCanvas(Math.min(Math.max(0,t), src.src.duration - 0.001));
+            if (fc) drawSourceWithTransform(ctx, fc, fc.width, fc.height, w, h, src);
+          } else if (src.type === "image" && src.bitmap){
+            drawSourceWithTransform(ctx, src.bitmap, src.bitmap.width, src.bitmap.height, w, h, src);
+          }
+        };
+        const enc = await encodeFrames(total, project.fps, project.width, project.height, drawFrame, keySet, ()=>{});
+        _crossMixCache.set(sig, { chunks: enc.chunks, decoderDescription: enc.decoderDescription });
+      } catch(e){
+        // falhou — cacheia vazio pra não tentar de novo
+        _crossMixCache.set(sig, { chunks: [], decoderDescription: null });
+      }
+    })());
+  }
+  await Promise.all(tasks);
 }
 
 /* ============================================================
@@ -678,12 +1329,63 @@ function setProgress(p){
 function hasVideoLayer(){ return project.stack.some(l => l.type === "video" && l.src); }
 function hasBitstreamLayer(){ return project.stack.some(l => l.kind === "bitstream" && l.enabled); }
 
+/* ---------- SCOPING de bitstream (fronteira topo-do-painel → base) ----------
+   A camada bitstream habilitada MAIS PRÓXIMA DO TOPO do painel (menor índice)
+   define uma FRONTeira. Tudo ACIMA dela (índices < moshIdx) é composto em
+   tempo real sobre o resultado moshado e NÃO entra no encode. Tudo ABAIXO
+   (índices >= moshIdx, incluindo a própria camada bitstream) é codificado +
+   moshado + decodificado. Assim, um vídeo ACIMA de um corrupt NÃO é afetado
+   por ele — só o que está abaixo entra no stream que o corrupt vai XORear.
+   Retorna -1 se não há camada bitstream habilitada. */
+function getMoshScopeIdx(){
+  for (let i = 0; i < project.stack.length; i++){
+    const l = project.stack[i];
+    if (l.enabled && l.kind === "bitstream") return i;
+  }
+  return -1;
+}
+
+/** True se há pelo menos uma camada src/pixelfx habilitada com mídia carregada
+ *  no grupo "abaixo" (índices >= moshIdx). Se moshIdx < 0 (sem bitstream),
+ *  degrada para hasAnySrc(). Usada p/ decidir se Vale a pena codificar/decodificar
+ *  (sem src abaixo, o stream seria preto e o mosh não teria efeito visível). */
+function hasSrcBelowMosh(){
+  const moshIdx = getMoshScopeIdx();
+  if (moshIdx < 0) return hasAnySrc();
+  for (let i = moshIdx; i < project.stack.length; i++){
+    const l = project.stack[i];
+    if (!l.enabled || l.kind === "bitstream") continue;
+    if (l.src || l.bitmap) return true;
+  }
+  return false;
+}
+
+/** True se há camadas src/pixelfx habilitadas no grupo "acima" (índices < moshIdx).
+ *  Essas camadas serão composições em tempo real sobre o frame decodificado. */
+function hasSrcAboveMosh(){
+  const moshIdx = getMoshScopeIdx();
+  if (moshIdx <= 0) return false;
+  for (let i = 0; i < moshIdx; i++){
+    const l = project.stack[i];
+    if (!l.enabled || l.kind === "bitstream") continue;
+    return true; // qualquer layer (mesmo sem mídia) conta — pixelfx aplica sobre o composto
+  }
+  return false;
+}
+
 /** Verifica se o encode em cache está atualizado para o estado atual das camadas.
  *  Usado para o indicador vermelho/verde nas camadas bitstream:
  *  - sem camadas bitstream → sempre "fresh" (não precisa de encode)
  *  - com bitstream: fresh se cachedEncode existe e assinatura bate com estado atual */
+// Flag que indica que params bitstream mudaram desde o último decode bem-sucedido.
+// Os chunks codificados NÃO precisam re-codificar (params bitstream agem pós-encode),
+// mas o MOSH precisa ser re-aplicado e os frames re-decodificados. Sem essa flag, o
+// indicador verde/vermelho mente (fica verde mesmo após mudar melt cortes, bloom count,
+// corrupt intensity, etc.) e o usuário não sabe que precisa clicar Aplicar de novo.
+let _bitstreamDirty = false;
 function isBitstreamEncodeFresh(){
   if (!hasBitstreamLayer()) return true;
+  if (_bitstreamDirty) return false; // params bitstream mudaram → mosh pendente
   if (!cachedEncode) return false;
   const total = Math.max(1, Math.round(project.duration * project.fps));
   const sig = encodeSignature(total);
@@ -892,33 +1594,46 @@ function bindTransformEvents(container, layer){
     posxInput.parentElement.style.opacity = dis ? ".4" : "1";
     posyInput.parentElement.style.opacity = dis ? ".4" : "1";
   }
-  // Redesenha o 1º frame da fonte no canvas aplicando as transforms atuais.
-  // NÃO chama applyAll — só mostra o preview estático do frame 0 com a transform.
-  // Se já tem um resultado processado (currentDecodedFrames), não sobrescreve.
+  // Redesenha o frame da fonte na posição atual do trim, aplicando as transforms atuais.
+  // NÃO chama applyAll — só mostra o preview estático do frame correspondente ao trim.
+  // Não sobrescreve se está tocando (playback tem prioridade).
   function redrawSourcePreview(){
-    if (currentDecodedFrames.length > 0) return; // tem processamento ativo, não mexer
     if (isPlaying()) return; // está tocando, não interromper
     drawSourceFirstFrame(layer);
+  }
+  // Invalida qualquer processamento anterior (currentDecodedFrames, lastMoshResult,
+  // lastStaticCanvas, cachedEncode) — chamado quando o usuário muda algo que torna o
+  // resultado processado obsoleto (trim, stretch, scale, posX, posY). Limpa também o
+  // currentDecodedFrames para que redrawSourcePreview não aborte cedo.
+  function invalidateProcessed(){
+    currentDecodedFrames = [];
+    lastMoshResult = null;
+    lastStaticCanvas = null;
+    invalidateEncode();
   }
   stretchInput.onchange = (e) => {
     layer.stretch = e.target.checked;
     syncDisabled();
+    invalidateProcessed();
     redrawSourcePreview();
     refreshEncDots();
   };
   scaleInput.oninput = (e) => {
     layer.scale = +e.target.value;
     scaleVal.textContent = layer.scale.toFixed(2) + "×";
+    invalidateProcessed();
     redrawSourcePreview();
   };
   posxInput.oninput = (e) => {
     layer.posX = +e.target.value;
     posxVal.textContent = Math.round(layer.posX) + "px";
+    invalidateProcessed();
     redrawSourcePreview();
   };
   posyInput.oninput = (e) => {
     layer.posY = +e.target.value;
     posyVal.textContent = Math.round(layer.posY) + "px";
+    invalidateProcessed();
     redrawSourcePreview();
   };
   syncDisabled();
@@ -930,7 +1645,11 @@ async function drawSourceFirstFrame(layer){
   try {
     let srcCanvas = null, srcW = 0, srcH = 0;
     if (layer.type === "video" && layer.src){
-      srcCanvas = await layer.src.getFrameCanvas(0);
+      // Usa o regionOffset (posição do trim) em vez de 0 — assim mexer no slider de trim
+      // atualiza o preview mesmo com o vídeo pausado. Mesma fórmula do renderFrame para o frame 0.
+      const t = layer.regionOffset || 0;
+      const safeT = Math.min(Math.max(0, t), layer.src.duration - 0.001);
+      srcCanvas = await layer.src.getFrameCanvas(safeT);
       if (srcCanvas){ srcW = srcCanvas.width; srcH = srcCanvas.height; }
     } else if (layer.type === "image" && layer.bitmap){
       srcCanvas = layer.bitmap;
@@ -993,7 +1712,14 @@ function buildLayerParams(container, layer){
             ctx.drawImage(layerCanvas, 0, 0);
           }
         } catch(e){}
-        setStatus("Vídeo carregado. Ajuste os parâmetros e clique Aplicar.");
+        // Auto-play: vídeo carregado já inicia reprodução em tempo real (Mode 1).
+        // Mudanças em trim/scale/pos/efeitos pixel refletem IMEDIATAMENTE no playback.
+        // Bitstream continua exigindo Aplicar (precisa de encode/decode pesado).
+        if (!isPlaying() && hasAnySrc()){
+          startPlayback();
+          $("playPauseBtn").textContent = "⏸";
+        }
+        setStatus("Vídeo carregado — reproduzindo. Ajuste os parâmetros e veja em tempo real.");
         refreshEncDots();
       } catch(err){ setStatus("Erro ao carregar vídeo: " + err.message); }
     };
@@ -1013,7 +1739,10 @@ function buildLayerParams(container, layer){
       layer.regionOffset = +e.target.value;
       if (layer.src) layer.regionOffset = clamp(layer.regionOffset, 0, Math.max(0, layer.src.duration - project.duration));
       updateOffsetUI();
-      scheduleAutoApply();
+      // Trim muda qual frame da fonte é mostrado — invalida qualquer processamento anterior
+      // (que foi feito com trim antigo) e redesenha o preview com o novo frame.
+      invalidateProcessed();
+      redrawSourcePreview();
     };
     // mini-tl drag
     const miniTl = container.querySelector(".lc-mini-tl");
@@ -1030,7 +1759,8 @@ function buildLayerParams(container, layer){
       layer.regionOffset = clamp(startOff + delta, 0, Math.max(0, layer.src.duration - project.duration));
       offsetInput.value = layer.regionOffset;
       updateOffsetUI();
-      scheduleAutoApply();
+      invalidateProcessed();
+      redrawSourcePreview();
     });
     const endDrag = () => { dragging = false; };
     region.addEventListener("pointerup", endDrag);
@@ -1070,7 +1800,12 @@ function buildLayerParams(container, layer){
           drawSourceWithTransform(lctx, bmp, bmp.width, bmp.height, project.width, project.height, layer);
           ctx.drawImage(layerCanvas, 0, 0);
         } catch(e){}
-        setStatus("Imagem carregada. Ajuste os parâmetros e clique Aplicar.");
+        // Auto-play: imagem carregada também inicia reprodução (mesmo comportamento do vídeo).
+        if (!isPlaying() && hasAnySrc()){
+          startPlayback();
+          $("playPauseBtn").textContent = "⏸";
+        }
+        setStatus("Imagem carregada — reproduzindo. Ajuste os parâmetros e veja em tempo real.");
         refreshEncDots();
       } catch(err){ setStatus("Erro ao carregar imagem: " + err.message); }
     };
@@ -1147,6 +1882,210 @@ function buildLayerParams(container, layer){
     container.querySelector(".lc-ang").oninput = (e) => { layer.angle = +e.target.value; container.querySelector(".lc-ang-val").textContent = e.target.value; scheduleAutoApply(); };
     container.querySelector(".lc-amt").oninput = (e) => { layer.amount = +e.target.value; container.querySelector(".lc-amt-val").textContent = e.target.value; scheduleAutoApply(); };
   }
+  // ===== NOVOS BITSTREAM CARDS =====
+  else if (layer.type === "reorder"){
+    container.innerHTML = `
+      <label>Quantidade (% dos chunks delta) <span class="val lc-amt-val">${layer.amount}</span>
+        <input type="range" class="lc-amt" min="0" max="100" value="${layer.amount}">
+      </label>
+      <label>Seed
+        <div class="seed-row">
+          <input type="number" class="lc-seed" min="1" max="99999" value="${layer.seed}">
+          <button type="button" class="lc-randseed" title="Randomizar seed">🎲</button>
+        </div>
+      </label>
+      <div class="hint">Embaralha a ordem dos P-frames — movimento rebobina erraticamente. Cada seed gera um shuffle diferente.</div>
+    `;
+    container.querySelector(".lc-amt").oninput = (e) => { layer.amount = +e.target.value; container.querySelector(".lc-amt-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-seed").onchange = (e) => { layer.seed = +e.target.value || 1; markBitstreamDirty(); };
+    container.querySelector(".lc-randseed").onclick = () => {
+      layer.seed = Math.floor(Math.random() * 99999) + 1;
+      container.querySelector(".lc-seed").value = layer.seed;
+      markBitstreamDirty();
+    };
+  }
+  else if (layer.type === "smear"){
+    container.innerHTML = `
+      <label>Frame de congelamento <span class="val lc-frz-val">${layer.freezeAt}</span>
+        <input type="range" class="lc-frz" min="1" max="100" value="${layer.freezeAt}">
+      </label>
+      <label>Repetições <span class="val lc-cnt-val">${layer.count}</span>
+        <input type="range" class="lc-cnt" min="2" max="60" value="${layer.count}">
+      </label>
+      <div class="hint">Replica UM único P-frame N vezes — "TV quebrada congelada". Diferente do bloom (que cicla janela), smear congela num delta só.</div>
+    `;
+    container.querySelector(".lc-frz").oninput = (e) => { layer.freezeAt = +e.target.value; container.querySelector(".lc-frz-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "drop"){
+    container.innerHTML = `
+      <label>Drop (% dos P-frames) <span class="val lc-pct-val">${layer.percent}</span>
+        <input type="range" class="lc-pct" min="0" max="80" value="${layer.percent}">
+      </label>
+      <label>Seed
+        <div class="seed-row">
+          <input type="number" class="lc-seed" min="1" max="99999" value="${layer.seed}">
+          <button type="button" class="lc-randseed" title="Randomizar seed">🎲</button>
+        </div>
+      </label>
+      <div class="hint">Dropa aleatoriamente N% dos P-frames — stutter + drift acumulado. Keyframes nunca são dropados.</div>
+    `;
+    container.querySelector(".lc-pct").oninput = (e) => { layer.percent = +e.target.value; container.querySelector(".lc-pct-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-seed").onchange = (e) => { layer.seed = +e.target.value || 1; markBitstreamDirty(); };
+    container.querySelector(".lc-randseed").onclick = () => {
+      layer.seed = Math.floor(Math.random() * 99999) + 1;
+      container.querySelector(".lc-seed").value = layer.seed;
+      markBitstreamDirty();
+    };
+  }
+  else if (layer.type === "reverse"){
+    container.innerHTML = `
+      <label>De (frame) <span class="val lc-from-val">${layer.fromFrame}</span>
+        <input type="range" class="lc-from" min="1" max="100" value="${layer.fromFrame}">
+      </label>
+      <label>Até (frame, 0 = final) <span class="val lc-to-val">${layer.toFrame}</span>
+        <input type="range" class="lc-to" min="0" max="200" value="${layer.toFrame}">
+      </label>
+      <div class="hint">Inverte a ordem dos P-frames no range — movimento vai pra trás + drift acumulado.</div>
+    `;
+    container.querySelector(".lc-from").oninput = (e) => { layer.fromFrame = +e.target.value; container.querySelector(".lc-from-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-to").oninput = (e) => { layer.toFrame = +e.target.value; container.querySelector(".lc-to-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "stutter"){
+    container.innerHTML = `
+      <label>Janela (chunks) <span class="val lc-win-val">${layer.windowSize}</span>
+        <input type="range" class="lc-win" min="1" max="8" value="${layer.windowSize}">
+      </label>
+      <label>Padrão (reps separadas por vírgula)
+        <input type="text" class="lc-pat" value="${layer.pattern}">
+      </label>
+      <div class="hint">Repete a janela em ritmo — "3,1,2,1" = 3 reps / 1 novo / 2 reps / 1 novo. Cria pulsação rítmica.</div>
+    `;
+    container.querySelector(".lc-win").oninput = (e) => { layer.windowSize = +e.target.value; container.querySelector(".lc-win-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-pat").oninput = (e) => { layer.pattern = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "crossmix"){
+    container.innerHTML = `
+      <label>Frame de início <span class="val lc-from-val">${layer.fromFrame}</span>
+        <input type="range" class="lc-from" min="1" max="100" value="${layer.fromFrame}">
+      </label>
+      <label>Chunks da 2ª fonte <span class="val lc-cnt-val">${layer.count}</span>
+        <input type="range" class="lc-cnt" min="1" max="60" value="${layer.count}">
+      </label>
+      <label>Fonte (N-ésima src abaixo) <span class="val lc-src-val">${layer.sourceIdx}</span>
+        <input type="range" class="lc-src" min="1" max="5" value="${layer.sourceIdx}">
+      </label>
+      <div class="hint">Splica P-frames de OUTRA fonte src (abaixo desta no painel) no stream atual. "Transição orgânica" entre dois clipes sem corte real.</div>
+    `;
+    container.querySelector(".lc-from").oninput = (e) => { layer.fromFrame = +e.target.value; container.querySelector(".lc-from-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-src").oninput = (e) => { layer.sourceIdx = +e.target.value; container.querySelector(".lc-src-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "keyinject"){
+    container.innerHTML = `
+      <label>No frame <span class="val lc-at-val">${layer.atFrame}</span>
+        <input type="range" class="lc-at" min="1" max="100" value="${layer.atFrame}">
+      </label>
+      <div class="hint">Força um keyframe no meio do stream — decoder resincroniza. Efeito "flash/reset parcial" no meio do mosh.</div>
+    `;
+    container.querySelector(".lc-at").oninput = (e) => { layer.atFrame = +e.target.value; container.querySelector(".lc-at-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  // ===== SLICE-LEVEL CARDS =====
+  else if (layer.type === "slicedrop"){
+    container.innerHTML = `
+      <label>Chunks afetados <span class="val lc-cnt-val">${layer.count}</span>
+        <input type="range" class="lc-cnt" min="1" max="15" value="${layer.count}">
+      </label>
+      <label>Intensidade (30-80% drop) <span class="val lc-int-val">${layer.intensity}</span>
+        <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
+      </label>
+      <div class="hint">Dropa NAL units de slice dentro dos P-frames — "torn horizontal". Pode abortar decode em GPU fraca.</div>
+    `;
+    container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "slicehdr"){
+    container.innerHTML = `
+      <label>Chunks afetados <span class="val lc-cnt-val">${layer.count}</span>
+        <input type="range" class="lc-cnt" min="1" max="15" value="${layer.count}">
+      </label>
+      <label>Intensidade <span class="val lc-int-val">${layer.intensity}</span>
+        <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
+      </label>
+      <div class="hint">Corrompe bytes do slice header (frame_num, slice_type) — decoder reaplica frames errados. Mais cirúrgico que o corrupt genérico.</div>
+    `;
+    container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "mblock"){
+    container.innerHTML = `
+      <label>Chunks afetados <span class="val lc-cnt-val">${layer.count}</span>
+        <input type="range" class="lc-cnt" min="1" max="15" value="${layer.count}">
+      </label>
+      <label>Intensidade <span class="val lc-int-val">${layer.intensity}</span>
+        <input type="range" class="lc-int" min="0" max="100" value="${layer.intensity}">
+      </label>
+      <div class="hint">XOR denso no slice data — afeta codificação de macroblocks. "Block mosaic" aleatório. Best-effort sem parser Exp-Golomb completo.</div>
+    `;
+    container.querySelector(".lc-cnt").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-cnt-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-int").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-int-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  // ===== NOVOS PIXEL FX CARDS =====
+  else if (layer.type === "databend"){
+    container.innerHTML = `
+      <label>Quantidade <span class="val lc-amt-val">${layer.amount}</span>
+        <input type="range" class="lc-amt" min="0" max="100" value="${layer.amount}">
+      </label>
+      <label>Modo
+        <select class="lc-mode">
+          <option value="xor" ${layer.mode==="xor"?"selected":""}>XOR esparso</option>
+          <option value="shift" ${layer.mode==="shift"?"selected":""}>Shift horizontal</option>
+          <option value="swap" ${layer.mode==="swap"?"selected":""}>Swap blocos</option>
+        </select>
+      </label>
+      <label>Seed
+        <div class="seed-row">
+          <input type="number" class="lc-seed" min="1" max="99999" value="${layer.seed}">
+          <button type="button" class="lc-randseed" title="Randomizar seed">🎲</button>
+        </div>
+      </label>
+      <div class="hint">Trata pixels como bytes brutos e XOR/shift/swap — databend clássico. Menos autêntico que corrupt (ataca pixels, não bitstream).</div>
+    `;
+    container.querySelector(".lc-amt").oninput = (e) => { layer.amount = +e.target.value; container.querySelector(".lc-amt-val").textContent = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-mode").onchange = (e) => { layer.mode = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-seed").onchange = (e) => { layer.seed = +e.target.value || 1; scheduleAutoApply(); };
+    container.querySelector(".lc-randseed").onclick = () => {
+      layer.seed = Math.floor(Math.random() * 99999) + 1;
+      container.querySelector(".lc-seed").value = layer.seed;
+      scheduleAutoApply();
+    };
+  }
+  else if (layer.type === "qpboost"){
+    container.innerHTML = `
+      <label>QP (1-51, alto = mais blocking) <span class="val lc-qp-val">${layer.qp}</span>
+        <input type="range" class="lc-qp" min="1" max="51" value="${layer.qp}">
+      </label>
+      <label>Frames afetados <span class="val lc-frm-val">${layer.frames}</span>
+        <input type="range" class="lc-frm" min="1" max="60" value="${layer.frames}">
+      </label>
+      <div class="hint">Quantiza pixels em blocos (tamanho controlado pelo QP) simulando blocking artifacts. Efeito visual sem re-codificar.</div>
+    `;
+    container.querySelector(".lc-qp").oninput = (e) => { layer.qp = +e.target.value; container.querySelector(".lc-qp-val").textContent = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-frm").oninput = (e) => { layer.frames = +e.target.value; container.querySelector(".lc-frm-val").textContent = e.target.value; scheduleAutoApply(); };
+  }
+  else if (layer.type === "posterize"){
+    container.innerHTML = `
+      <label>Níveis de cor <span class="val lc-lvl-val">${layer.levels}</span>
+        <input type="range" class="lc-lvl" min="2" max="16" value="${layer.levels}">
+      </label>
+      <label>Dither (%) <span class="val lc-dth-val">${layer.dither}</span>
+        <input type="range" class="lc-dth" min="0" max="100" value="${layer.dither}">
+      </label>
+      <div class="hint">Reduz níveis de cor por canal + Floyd-Steinberg. Estética 8-bit — combina com mosh.</div>
+    `;
+    container.querySelector(".lc-lvl").oninput = (e) => { layer.levels = +e.target.value; container.querySelector(".lc-lvl-val").textContent = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-dth").oninput = (e) => { layer.dither = +e.target.value; container.querySelector(".lc-dth-val").textContent = e.target.value; scheduleAutoApply(); };
+  }
 }
 
 /* ---------- adicionar camadas ---------- */
@@ -1163,15 +2102,11 @@ document.querySelectorAll(".add-grid button").forEach(btn => {
         if (card) card.querySelector(".lc-load").click();
       }, 50);
     }
-    // efeito bitstream: avisa NA HORA se este ambiente não decodifica streams moshados
-    // (decode de software aborta; só hardware tolera). Melhor que falhar só ao clicar Aplicar.
     if (layer.kind === "bitstream"){
-      hwDecodeProbe().then(ok => {
-        if (!ok && !window.__hwWarned){
-          window.__hwWarned = true;
-          setStatus("⚠ Aviso: este navegador/GPU não decodifica datamosh por hardware — efeitos bitstream podem não renderizar. Veja chrome://gpu ou use Chrome/Edge com aceleração de hardware ativa.");
-        }
-      });
+      // Alterar a pilha bitstream invalida o mosh atual; o usuário reaplica manualmente.
+      // Não rode um "teste de GPU" aqui: ele não identifica qual efeito gerou um stream
+      // inválido e acabava culpando o ambiente por regressões na manipulação dos chunks.
+      markBitstreamDirty();
     }
   };
 });
@@ -1255,10 +2190,15 @@ $("playPauseBtn").onclick = () => {
 };
 
 function encodeSignature(total){
-  // Captura TODA a composição (src + pixel-fx) + dimensões + fps + duração + cortes.
-  // Bitstream layers não entram (atuam pós-encode, não invalidam o cache).
+  // Captura a composição do grupo "ABAIXO" da fronteira bitstream (índices >= moshIdx)
+  // + dimensões + fps + duração + cortes + o próprio moshIdx (mover src através da
+  // fronteira invalida o cache). Bitstream layers não entram na assinatura de composição
+  // (atuam pós-encode), mas o moshIdx entra — se o usuário habilita/desabilita/reordena
+  // uma camada bitstream, o moshIdx muda e invalida o cache.
+  const moshIdx = getMoshScopeIdx();
+  const fromIdx = moshIdx < 0 ? 0 : moshIdx;
   const state = project.stack
-    .filter(l => l.kind !== "bitstream")
+    .filter((l, idx) => idx >= fromIdx && l.kind !== "bitstream")
     .map(l => {
       const p = { id:l.id, type:l.type, en:l.enabled, bl:l.blend, op:l.opacity, cl:l.clip };
       if (l.type === "video" && l.src){
@@ -1275,7 +2215,9 @@ function encodeSignature(total){
       return JSON.stringify(p);
     });
   const cuts = allCutPoints(total).join(",");
-  return [state.join("|"), project.duration, project.fps, project.width, project.height, cuts, total].join("§");
+  // moshIdx entra na assinatura: se o usuário habilita/desabilita/reordena uma camada
+  // bitstream, a fronteira muda e o cache precisa ser invalidado (o grupo "abaixo" mudou).
+  return [state.join("|"), project.duration, project.fps, project.width, project.height, cuts, total, moshIdx].join("§");
 }
 
 async function ensureEncoded(total){
@@ -1285,11 +2227,15 @@ async function ensureEncoded(total){
   const W = project.width, H = project.height;
   const keySet = new Set([0, ...allCutPoints(total)]);
 
+  // SCOPING: só codifica o grupo "ABAIXO" da fronteira bitstream (índices >= moshIdx).
+  // Assim, fontes acima do topmost bitstream não entram no stream que vai ser moshado.
+  const moshIdx = getMoshScopeIdx();
+  const fromIdx = moshIdx < 0 ? 0 : moshIdx;
   const drawFrame = async (i, ctx, w, h) => {
-    await renderFrame(i, ctx, w, h, total);
+    await renderFrame(i, ctx, w, h, total, { fromIdx });
   };
   const { chunks, decoderDescription, width, height } = await encodeFrames(total, project.fps, W, H, drawFrame, keySet, setProgress);
-  cachedEncode = { chunks, decoderDescription, width, height, fps: project.fps, total, sig };
+  cachedEncode = { chunks, decoderDescription, width, height, fps: project.fps, total, sig, moshIdx };
   return cachedEncode;
 }
 
@@ -1312,12 +2258,18 @@ async function applyAll(){
   const rng = mulberry32(hashInt(seed));
   const total = Math.max(1, Math.round(project.duration * project.fps));
   const hasBS = hasBitstreamLayer();
+  // SCOPING: se há bitstream mas NENHUMA fonte no grupo "abaixo" (índices >= moshIdx),
+  // o bitstream não tem o que moshar — degrada para Mode 1 (composição em tempo real)
+  // com aviso. Caso contrário, o encoder produziria um stream preto e o usuário veria
+  // só um quadro escuro.
+  const hasSrcBelow = hasSrcBelowMosh();
+  const effectiveHasBS = hasBS && hasSrcBelow;
 
   // libera frames decodificados antigos (agora são OffscreenCanvas — sem close(); GC cuida disso)
   currentDecodedFrames = [];
 
-  // MODO 1: sem bitstream → composição em tempo real (zero encode)
-  if (!hasBS){
+  // MODO 1: sem bitstream (ou bitstream sem fonte abaixo) → composição em tempo real (zero encode)
+  if (!effectiveHasBS){
     lastMoshResult = null;
     lastStaticCanvas = null;
     cachedEncode = null;
@@ -1332,20 +2284,42 @@ async function applyAll(){
     $("exportPngBtn").disabled = false;
     $("exportMp4Btn").disabled = false;
     $("playPauseBtn").disabled = false;
-    setStatus("Composição pronta. Clique Play para reproduzir.");
+    // Auto-play após Aplicar (comportamento consistente com auto-play ao carregar mídia)
+    if (!isPlaying() && hasAnySrc()){
+      startPlayback();
+      $("playPauseBtn").textContent = "⏸";
+    }
+    if (hasBS && !hasSrcBelow){
+      setStatus("Efeito bitstream sem fonte abaixo no painel — adicione uma fonte (vídeo/imagem) ABAIXO do efeito para vê-lo em ação. Por ora, composição em tempo real (sem mosh).");
+    } else {
+      setStatus("Composição pronta — reproduzindo.");
+    }
     $("applyBtn").disabled = false;
     updateActionButtons();
     applyAllRunning = false;
     return;
   }
 
-  // MODO 2: com bitstream → encode (cacheado) + manipular + decode
+  // MODO 2: com bitstream + fonte abaixo → encode (cacheado, só grupo "abaixo") + manipular + decode
   setProgress(0);
+  const wasDirty = _bitstreamDirty; // captura antes do processamento pra mensagem de status
   try {
     const enc = await ensureEncoded(total);
-    const { chunks, decoderDescription, width, height, fps } = enc;
+    const { chunks, decoderDescription, width, height, fps, moshIdx } = enc;
+    // Pré-codifica fontes para crossmix (se houver) ANTES de aplicar bitstream layers
+    // — applyBitstreamLayers é síncrona e precisa dos chunks da 2ª fonte já no cache.
+    if (project.stack.some(l => l.type === "crossmix" && l.enabled)){
+      setStatus("Codificando fontes para cross-mix…");
+      await preEncodeCrossMixSources(total);
+    }
+    // Avisa que está re-moshando (mesmo se o encode vier do cache, o mosh + decode rodam de novo)
+    if (wasDirty){
+      setStatus("Re-aplicando mosh com novos parâmetros…");
+      setProgress(0.3);
+    }
     const { chunks: moshed, notes } = applyBitstreamLayers(chunks, fps, rng);
-    lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps };
+    // guarda moshIdx no resultado — playback precisa para saber se há grupo "acima" para compor
+    lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps, moshIdx };
     lastStaticCanvas = null;
 
     setStatus("Decodificando " + moshed.length + " frames…"); setProgress(0.55);
@@ -1353,34 +2327,55 @@ async function applyAll(){
     // decodifica TODOS os frames e armazena (recuperação parcial: usa o que decodificou mesmo se abortou)
     const { frames, error: decErr } = await decodeAllFrames(moshed, decoderDescription, width, height);
     if (frames.length === 0){
-      // zero frames = o decoder não conseguiu nem começar. Quase sempre é falta de decode H.264 de
-      // hardware (streams datamoshados violam o spec; só o decoder de hardware tolera via concealment).
-      const hwOk = await hwDecodeProbe();
-      if (!hwOk){
-        setStatus("Seu navegador não conseguiu decodificar o stream moshado — o decode de vídeo por software não tolera datamosh. Ative a aceleração de hardware (veja chrome://gpu) ou use Chrome/Edge com GPU.");
-      } else {
-        setStatus("Decode falhou" + (decErr ? " ("+decErr+")" : "") + ". Tente reduzir a intensidade/contagem dos efeitos.");
-      }
+      // Não inventar diagnóstico de GPU: mostre o erro real devolvido pelo decoder.
+      // Alguns efeitos novos podem produzir um stream inválido por conta própria;
+      // atribuir tudo à aceleração de hardware escondia a regressão verdadeira.
+      setStatus("Decode falhou" + (decErr ? " (" + decErr + ")" : "") + ". Reduza o efeito ativo ou desative-o para identificar qual operação gerou um stream inválido.");
       setProgress(null);
       $("applyBtn").disabled = false;
       applyAllRunning = false;
       return;
     }
     currentDecodedFrames = frames;
+    _bitstreamDirty = false; // mosh aplicado e frames re-decodificados com sucesso — indicador pode voltar pra verde
 
-    // desenha 1º frame no canvas (preview estático)
+    // desenha 1º frame no canvas (preview estático) + composição do grupo "acima" se houver
     const c = $("stage");
     c.width = width; c.height = height;
-    const ctx = c.getContext("2d");
-    try { ctx.drawImage(frames[0], 0, 0, width, height); } catch(e){}
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    const hasAbove = moshIdx > 0 && hasSrcAboveMosh();
+    try {
+      if (hasAbove){
+        // double-buffer: desenha frame decodificado no back, compõe acima, copia pro canvas visível
+        const back = new OffscreenCanvas(width, height);
+        const bctx = back.getContext("2d", { willReadFrequently: true });
+        bctx.drawImage(frames[0], 0, 0, width, height);
+        await renderFrame(0, bctx, width, height, total, { fromIdx: 0, toIdx: moshIdx - 1, clear: false });
+        ctx.clearRect(0, 0, width, height);
+        ctx.drawImage(back, 0, 0);
+      } else {
+        ctx.drawImage(frames[0], 0, 0, width, height);
+      }
+    } catch(e){}
 
     $("exportMp4Btn").disabled = false;
     $("playPauseBtn").disabled = false;
-    if (decErr && frames.length < moshed.length){
-      // decode abortou no meio (stream quebrado demais p/ o decoder) — mostra o que deu, com aviso
-      setStatus(`Processado parcialmente — ${frames.length}/${moshed.length} frames (o decoder parou no stream mais quebrado). Reduza a intensidade p/ o resultado completo.`);
+    // Auto-play após Aplicar (consistente com auto-play ao carregar mídia)
+    if (!isPlaying() && frames.length > 0){
+      startPlayback();
+      $("playPauseBtn").textContent = "⏸";
+    }
+    // Detecta decode incompleto: às vezes o decoder não dá erro explícito, só para de emitir
+    // frames no meio do stream (software decoder não tolera streams moshados pesados). Se
+    // decodificou menos frames do que enviou chunks, está incompleto — avisa claramente.
+    const incomplete = frames.length < moshed.length;
+    if (incomplete){
+      const pct = Math.round((frames.length / moshed.length) * 100);
+      setStatus(`⚠ Decode incompleto — só ${frames.length}/${moshed.length} frames (${pct}%). O decoder abortou no meio do stream moshado. Reduza intensidade/contagem dos efeitos pra um resultado completo. Reproduzindo o que decodificou.`);
+    } else if (hasAbove){
+      setStatus(`Processado — ${frames.length} frames moshados + composição "acima" em tempo real. Reproduzindo.`);
     } else {
-      setStatus(`Processado — ${frames.length} frames prontos. Clique Play para reproduzir.`);
+      setStatus(`Processado — ${frames.length} frames prontos. Reproduzindo.`);
     }
     setProgress(null);
     refreshEncDots();
@@ -1423,63 +2418,64 @@ async function decodeAllFrames(chunks, decoderDescription, w, h){
   return { frames, error };
 }
 
-/** Testa de VERDADE se este ambiente decodifica um stream datamoshado (P-frame duplicado).
- *  `VideoDecoder.isConfigSupported()` NÃO serve — ele retorna true para software, que depois
- *  aborta no stream quebrado. Aqui codificamos um clipe minúsculo, duplicamos um delta (= bloom)
- *  e tentamos decodar: se sair ≥1 frame, o concealment de hardware funciona; senão, não dá.
- *  Memoizado (roda uma vez só). */
-let _hwDecodeProbeResult = null;
-async function hwDecodeProbe(){
-  if (_hwDecodeProbeResult !== null) return _hwDecodeProbeResult;
-  try {
-    const W=64,H=64,FPS=24,N=12;
-    const cv=new OffscreenCanvas(W,H); const cx=cv.getContext("2d");
-    const chunks=[]; let dd=null;
-    const enc=new VideoEncoder({ output:(c,m)=>{ if(m&&m.decoderConfig&&m.decoderConfig.description&&!dd)dd=m.decoderConfig.description; const b=new Uint8Array(c.byteLength); c.copyTo(b); chunks.push({type:c.type,timestamp:c.timestamp,duration:c.duration,data:b}); }, error:()=>{} });
-    enc.configure({ codec:CODEC, width:W, height:H, bitrate:500000, framerate:FPS, latencyMode:"realtime", avc:{format:"avc"} });
-    for(let i=0;i<N;i++){ cx.fillStyle=i%2?"#f00":"#00f"; cx.fillRect(0,0,W,H); cx.fillStyle="#fff"; cx.fillRect(i*4%W,0,8,H); const vf=new VideoFrame(cv,{timestamp:Math.round(i*1e6/FPS)}); enc.encode(vf,{keyFrame:i===0}); vf.close(); }
-    await enc.flush(); enc.close();
-    // bloom de teste: duplica o chunk delta 4 dez vezes
-    const dup=chunks[4]||chunks[1]; const dc={...dup,data:dup.data.slice()};
-    const broken=chunks.slice(0,5).concat(new Array(10).fill(dc)).concat(chunks.slice(5)).map((c,i)=>({...c,timestamp:Math.round(i*1e6/FPS)}));
-    let n=0, closed=false;
-    const dec=new VideoDecoder({ output:vf=>{ n++; vf.close(); }, error:()=>{ closed=true; } });
-    dec.configure({ codec:CODEC, codedWidth:W, codedHeight:H, description:dd, hardwareAcceleration:"prefer-hardware" });
-    for(const c of broken){ if(closed)break; try{ dec.decode(new EncodedVideoChunk({type:c.type,timestamp:c.timestamp,duration:c.duration,data:c.data})); }catch(e){ closed=true; break; } }
-    if(!closed){ try{ await dec.flush(); }catch(e){} }
-    try{ if(dec.state!=="closed") dec.close(); }catch(e){}
-    _hwDecodeProbeResult = n > broken.length * 0.5; // decodificou a maioria = concealment OK
-  } catch(e){ _hwDecodeProbeResult = false; }
-  return _hwDecodeProbeResult;
-}
-
 /** Inicia a reprodução. Decide Mode 1 (realtime) ou Mode 2 (decoded frames) automaticamente. */
 function startPlayback(){
   if (isPlaying()) return; // já está tocando
   const total = Math.max(1, Math.round(project.duration * project.fps));
   if (currentDecodedFrames.length > 0){
-    // Mode 2: toca frames decodificados
-    startDecodedPlayback(currentDecodedFrames, lastMoshResult.width, lastMoshResult.height, lastMoshResult.fps);
+    // Mode 2: toca frames decodificados (+ composição "acima" se houver fronteira bitstream)
+    startDecodedPlayback(currentDecodedFrames, lastMoshResult.width, lastMoshResult.height, lastMoshResult.fps, lastMoshResult.moshIdx);
   } else if (hasAnySrc()){
     // Mode 1: composição em tempo real
     startRealtimePlayback(project.width, project.height, project.fps, total);
   }
 }
 
-/** Reproduz frames já decodificados (Mode 2). */
-function startDecodedPlayback(frames, w, h, fps){
+/** Reproduz frames já decodificados (Mode 2).
+ *  Se há grupo "acima" (moshIdx > 0 com src/pixelfx acima da fronteira bitstream),
+ *  compõe esse grupo em tempo real sobre cada frame decodificado. Usa double-buffering
+ *  (back OffscreenCanvas → canvas visível) para evitar flicker durante o await do renderFrame. */
+function startDecodedPlayback(frames, w, h, fps, moshIdx){
   const player = { cancelled: false };
   currentPlaybackPlayer = player;
   const canvas = $("stage");
-  const ctx = canvas.getContext("2d");
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const total = frames.length;
+  const hasAbove = moshIdx > 0 && hasSrcAboveMosh();
+  // back buffer só é alocado se precisar compor o grupo "acima" (evita alocação desnecessária)
+  const back = hasAbove ? new OffscreenCanvas(w, h) : null;
+  const bctx = hasAbove ? back.getContext("2d", { willReadFrequently: true }) : null;
+  const frameDuration = 1000 / fps;
+  let nextFrameTime = performance.now();
+  let rendering = false;
   let i = 0;
-  function loop(){
+  async function loop(){
     if (player.cancelled) return;
-    if (frames[i]){
-      try { ctx.drawImage(frames[i], 0, 0, w, h); } catch(e){}
-      i = (i + 1) % frames.length;
+    const now = performance.now();
+    if (now >= nextFrameTime && !rendering){
+      rendering = true;
+      nextFrameTime = now + frameDuration;
+      try {
+        if (frames[i]){
+          if (hasAbove){
+            // compõe grupo "acima" sobre o frame decodificado (double-buffer p/ evitar flicker)
+            bctx.clearRect(0, 0, w, h);
+            bctx.drawImage(frames[i], 0, 0, w, h);
+            await renderFrame(i, bctx, w, h, total, { fromIdx: 0, toIdx: moshIdx - 1, clear: false });
+            if (player.cancelled) return;
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(back, 0, 0);
+          } else {
+            // sem grupo "acima" — só desenha o frame decodificado direto (caminho original)
+            ctx.drawImage(frames[i], 0, 0, w, h);
+          }
+          i = (i + 1) % frames.length;
+        }
+      } catch(e){}
+      rendering = false;
     }
-    setTimeout(() => requestAnimationFrame(loop), 1000/fps);
+    requestAnimationFrame(loop);
   }
   loop();
 }
@@ -1546,8 +2542,13 @@ function scheduleAutoApply(){
  *  manualmente. Motivo: bitstream params não invalidam o encode (reaproveitam o cache),
  *  mas disparar applyAll automático causava race condition entre players concorrentes. */
 function markBitstreamDirty(){
-  // nada a fazer aqui — só existe para documentar a intenção no código.
-  // O usuário clica Aplicar quando quiser ver o resultado.
+  // Sinaliza que params bitstream mudaram (melt cortes, bloom target/count, corrupt intensity,
+  // etc.). Os chunks codificados continuam válidos (params bitstream agem pós-encode), mas o
+  // MOSH precisa ser re-aplicado e os frames re-decodificados. Atualiza os pontos verde/vermelho
+  // imediatamente pra o usuário ver que precisa clicar Aplicar de novo.
+  if (!hasBitstreamLayer()) return;
+  _bitstreamDirty = true;
+  refreshEncDots();
 }
 
 /** Atualiza só os pontos vermelho/verde das camadas bitstream, sem re-renderizar o painel.
@@ -1575,16 +2576,40 @@ $("exportPngBtn").onclick = () => {
 
 /* Export MP4 — funciona nos dois modos:
    - Modo 2 (bitstream): usa os chunks já moshados de lastMoshResult
+     · Se houver grupo "acima" (src/pixelfx acima da fronteira bitstream), decodifica os
+       frames moshados, compõe o grupo "acima" sobre cada um e RE-CODIFICA, para que o
+       export inclua tanto o mosh quanto as camadas acima (caso contrário, o MP4 só teria
+       o grupo "abaixo" moshado e o usuário perderia as camadas de cima).
    - Modo 1 (tempo real): codifica agora na hora do export */
 $("exportMp4Btn").onclick = async () => {
   $("exportMp4Btn").disabled = true;
   setStatus("Exportando MP4…"); setProgress(0);
   try {
     let chunks, decoderDescription, width, height, fps = project.fps;
+    let moshIdx = -1;
 
     if (lastMoshResult){
       // Modo 2: chunks já moshados
-      ({ chunks, decoderDescription, width, height, fps } = lastMoshResult);
+      ({ chunks, decoderDescription, width, height, fps, moshIdx } = lastMoshResult);
+      // Se há grupo "acima", precisa re-codificar com o composto (mosh + acima)
+      if (moshIdx > 0 && hasSrcAboveMosh()){
+        setStatus("Re-codificando com camadas acima (export inclui mosh + composição)…");
+        const { frames } = await decodeAllFrames(chunks, decoderDescription, width, height);
+        if (frames.length === 0){
+          throw new Error("decode falhou ao preparar frames para re-codificação");
+        }
+        const total = frames.length;
+        const keySet = new Set([0]); // re-encode: keyframe só no 0 (sem cortes de melt, o mosh já está nos frames)
+        const drawFrame = async (i, ctx, w, h) => {
+          // desenha frame moshado + compõe grupo "acima" em cima (clear:false preserva o mosh)
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(frames[i], 0, 0, w, h);
+          await renderFrame(i, ctx, w, h, total, { fromIdx: 0, toIdx: moshIdx - 1, clear: false });
+        };
+        const enc = await encodeFrames(total, fps, width, height, drawFrame, keySet, setProgress);
+        chunks = enc.chunks; decoderDescription = enc.decoderDescription;
+        width = enc.width; height = enc.height;
+      }
     } else {
       // Modo 1: codifica agora (composição em tempo real, sem bitstream)
       const total = Math.max(1, Math.round(project.duration * project.fps));

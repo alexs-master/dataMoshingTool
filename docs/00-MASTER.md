@@ -8,21 +8,19 @@
 
 ## ⏱️ STATUS ATUAL  ·  PRÓXIMA AÇÃO
 
-- **Fase:** BUILD em andamento. Bloco 1 (núcleo) ✅, Bloco 0+2 (`index.html` real, upload+mosh+
-  preview+export) ✅, **Bloco 3 (sistema de camadas completo) ✅ concluído em sessão de revisão**
-  (2026-06-19/20) — UI unificada com 7 tipos de camada, blend modes, opacity, clip mask,
-  drag-reorder, e dois modos de reprodução (tempo real p/ composição sem bitstream; decode
-  progressivo p/ composição com bitstream). Bugs prévios do `index.html` antigo corrigidos
-  (multi-corte melt, intensity=0, drag-handle, flicker, deleção de camada, etc.).
+- **Fase:** BUILD em andamento. O arquivo continuado na z.ai acrescentou novos efeitos bitstream e
+  pixel-fx, mantendo a pilha unificada e o escopo por posição. A regressão que substituiu o decoder
+  validado por fallback software + diagnóstico genérico de GPU foi removida em
+  `codex/repair-zai-decoder`; o caminho rápido `prefer-hardware` foi restaurado sem apagar os efeitos.
 - **Prazo de entrega:** SÁBADO 2026-06-20.
 - **Janela de build:** SEXTA 2026-06-19 (estendida para a madrugada de sábado).
-- **➡️ PRÓXIMA AÇÃO ao retomar:** validar o **export MP4** real fora do ambiente de teste
-  (download e abertura em player externo), testar em outro navegador (Safari/Firefox), fazer
-  feature-detect de `hardwareAcceleration:'prefer-hardware'` para UX melhor quando GPU falta,
-  e considerar Bloco 6 (presets JSON+seed, deploy Vercel).
+- **➡️ PRÓXIMA AÇÃO ao retomar:** validar com mídia real no navegador do usuário os efeitos
+  bitstream clássicos e, separadamente, os novos efeitos destrutivos de slice/macroblock; depois
+  validar o export MP4 fora do navegador. Falhas devem expor o erro real do decoder, sem probe ou
+  fallback que as atribua genericamente à GPU.
 - **Log de progresso:** ver `DEVLOG.md` (atualizar a cada etapa).
-- **Repositório:** https://github.com/alexs-master/dataMoshingTool — commits pendentes para
-  o `index.html` atualizado com sistema de camadas (commitar na próxima sessão).
+- **Repositório:** https://github.com/alexs-master/dataMoshingTool — correção isolada na branch
+  `codex/repair-zai-decoder`, aguardando validação com mídia real.
 
 ---
 

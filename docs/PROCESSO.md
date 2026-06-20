@@ -243,6 +243,25 @@
   o código — flicker, drag em sliders, frame estático após delete, checkbox centralizado. Isso
   reforça a importância de testar com o usuário, não só com automação.
 
+### Fase 16 — Integração dos efeitos novos e restauração do decoder funcional (2026-06-20)
+- Após atingir o limite da sessão anterior, o usuário continuou o `index.html` na z.ai. Essa versão
+  acrescentou efeitos bitstream (`reorder`, `smear`, `drop`, `reverse`, `stutter`, `crossmix`,
+  `keyinject`, `slicedrop`, `slicehdr`, `mblock`) e pixel-fx adicionais, além do escopo em que o
+  bitstream afeta apenas a composição abaixo da camada correspondente. Esses recursos foram mantidos.
+- A comparação com o último arquivo funcional revelou que o decoder também havia sido reescrito:
+  `decodeChunks()` virou assíncrona, ganhou fallback automático para software/default e a interface
+  passou a executar `hwDecodeProbe()` para atribuir falhas genericamente à GPU. Essa combinação
+  mascarava erros reais e desviava do caminho empiricamente validado no projeto.
+- O decoder foi restaurado sem reverter os efeitos novos: uma única configuração
+  `prefer-hardware`, chunks entregues em ordem, yield a cada 16 chunks e captura síncrona de cada
+  `VideoFrame` em `OffscreenCanvas`. Não existe mais fallback silencioso nem probe paralelo.
+- A mensagem de erro passou a usar o erro efetivo do `VideoDecoder`. Isso separa duas situações:
+  regressão de infraestrutura (decoder não inicia) e efeito destrutivo demais (stream inválido),
+  especialmente relevante para operações experimentais em slice header/macroblocks.
+- A estrutura JavaScript foi validada com `node --check`. O teste automatizado em navegador ficou
+  impedido por falha de criação de processo do ambiente Windows, registrada sem transformar essa
+  limitação de teste em suposição sobre o computador do usuário.
+
 ---
 
 ## Decisões-chave (resumo)
