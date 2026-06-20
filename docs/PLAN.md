@@ -140,15 +140,15 @@ disparar, a UI deve mostrar o último frame bom e sugerir reduzir a intensidade 
 
 ## 4. Cronograma de SEXTA (de-risca o núcleo primeiro)
 
-| Bloco | Tempo | Tarefa |
-|---|---|---|
-| **0** | 30min | Criar `dataMoshingTool/index.html` LIMPO (shell mínimo). Portar do Loop Lab só os utils base (timing, seed, helpers, `downloadBlob`). Sem generators/effects |
+| Bloco | Tempo | Tarefa | Status |
+|---|---|---|---|
+| **0** | 30min | Criar `dataMoshingTool/index.html` LIMPO (shell mínimo). Portar do Loop Lab só os utils base (timing, seed, helpers, `downloadBlob`). Sem generators/effects | ✅ feito (2026-06-19) |
 | **1 ⚠️** | ~~2–3h~~ ✅ feito | ~~PRIMEIRO: protótipo isolado do núcleo~~ **CONCLUÍDO 2026-06-19** — rodado de verdade no Chrome (não index.html). Melt/bloom/corrupt confirmados reais, com os parâmetros corretos (ver §2b/2d). Ver `DEVLOG.md`. |
-| **2** | 1–2h | Plugar produtores reais: vídeo enviado (decode-by-seek) + imagem no encoder |
-| **3** | 1–2h | UI: pilha de camadas (compositing+blend, portado) + Painel Mosh: melt / bloom ×N / corrupt / drop% / seed |
-| **4** | 1h | Export: stream manipulado → MP4 (reusa mux) + GIF/PNG-seq do output decodificado |
-| **5** | 1h | Pixel-sort real (ImageData) + entrada de imagem |
-| **6** | 1h | Polish, presets JSON+seed, deploy Vercel |
+| **2** | 1–2h | Plugar produtores reais: vídeo enviado (decode-by-seek) + imagem no encoder | ✅ feito (2026-06-19) — vídeo via Mediabunny demux (não `<video>`) |
+| **3** | 1–2h | UI: pilha de camadas (compositing+blend, portado) + Painel Mosh: melt / bloom ×N / corrupt / drop% / seed | ✅ feito (2026-06-19/20) — rewrite completo com 7 tipos de camada, drag-reorder, blend/opacity/clip, params por tipo, 2 modos de reprodução |
+| **4** | 1h | Export: stream manipulado → MP4 (reusa mux) + GIF/PNG-seq do output decodificado | ⏳ parcial — MP4 ✅ (funciona nos 2 modos), PNG ✅, GIF pendente; export MP4 real ainda não validado fora do ambiente de teste |
+| **5** | 1h | Pixel-sort real (ImageData) + entrada de imagem | ✅ feito (2026-06-19) — pixel-sort ASDF + RGB shift como camadas |
+| **6** | 1h | Polish, presets JSON+seed, deploy Vercel | ⏳ pendente |
 
 **Sábado**: buffer, testes em navegador-alvo, entrega.
 
@@ -174,11 +174,14 @@ em volta do núcleo, com mecanismos portados pontualmente.
 
 ---
 
-## 6. Definição de "entregue" (sábado)
+## 6. Definição de "entregue" (sábado) — status
 
-- [ ] Upload de vídeo → datamosh real (I-frame removal + P-dup) → preview ao vivo → download MP4.
-- [ ] Upload de imagem → pixel-sort/corrupção real → export.
-- [ ] Controles: tipo de efeito, intensidade/Nx, pontos de corte, seed reprodutível.
-- [ ] Deploy no Vercel (estático, single-file).
-- Bônus se sobrar: empilhar 2 fontes c/ blend, reorder/drop, GIF/PNG-seq, presets compartilháveis.
-```
+- [x] Upload de vídeo → datamosh real (I-frame removal + P-dup + corrupt) → preview ao vivo → download MP4.
+- [x] Upload de imagem → pixel-sort/corrupção real → export PNG (e MP4 se quiser).
+- [x] Controles: tipo de efeito, intensidade/Nx, pontos de corte (múltiplos), seed reprodutível.
+- [x] **Sistema de camadas completo** (Bloco 3 ✅): 7 tipos de camada, blend/opacity/clip, drag-reorder.
+- [x] **Dois modos de reprodução** (adicionado 2026-06-20): tempo real (sem bitstream) + decode progressivo (com bitstream).
+- [ ] Deploy no Vercel (estático, single-file). ← pendente.
+- [ ] Validar export MP4 real (baixar + abrir em player externo). ← pendente.
+- Bônus: empilhar 2 fontes c/ blend ✅, reorder/drop ✅ (via sistema de camadas),
+  GIF (pendente), presets compartilháveis (pendente).

@@ -8,6 +8,7 @@
 :root{
   --bg:#0a0a0c; --panel:#121215; --line:#262630; --txt:#e8e8ee; --dim:#8a8a96;
   --acc:#ff2a6d; --acc2:#00e5ff; --ok:#3ddc84; --warn:#ffb300;
+  --src:#3ddc84; --pix:#00e5ff; --bit:#ffb300;
   --mono:"Cascadia Code","SF Mono",Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -21,6 +22,7 @@ button.primary{background:var(--acc);color:#000;border-color:var(--acc);font-wei
 button.primary:hover{background:#ff4d83}
 button:disabled{opacity:.35;cursor:default}
 button.ghost{background:transparent}
+button.tiny{padding:3px 7px;font-size:10.5px}
 select,input[type=number],input[type=text]{font-family:var(--mono);font-size:11.5px;background:#0e0e11;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:5px 7px}
 input[type=range]{width:100%;accent-color:var(--acc)}
 input[type=checkbox]{accent-color:var(--acc)}
@@ -28,103 +30,144 @@ label.field{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:va
 label.field .val{color:var(--acc2);font-weight:600}
 label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt);margin-bottom:6px;cursor:pointer}
 
-/* timeline-bar: barra representando o vídeo inteiro; a região destacada (largura fixa pela
-   duração escolhida) é arrastada inteira para reposicionar o trecho usado */
-.timeline-bar{position:relative;height:34px;background:#0e0e11;border:1px solid var(--line);border-radius:6px;margin:4px 0 2px;overflow:hidden}
-.timeline-region{position:absolute;top:0;bottom:0;left:0;width:30%;background:rgba(255,42,109,.32);border:1px solid var(--acc);border-radius:4px;cursor:grab;touch-action:none}
-.timeline-region:active{cursor:grabbing;background:rgba(255,42,109,.45)}
-.timeline-region::before{content:"⋮⋮";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--acc);font-size:11px;letter-spacing:2px;opacity:.8;pointer-events:none}
-
 #topbar{display:flex;align-items:center;gap:14px;padding:9px 14px;background:#101013;border-bottom:1px solid var(--line);flex-wrap:wrap}
 #logo{font-weight:800;font-size:13px;letter-spacing:.03em}
 #logo .dot{color:var(--acc)}
 .tb-group{display:flex;align-items:center;gap:6px}
 .tb-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 .spacer{flex:1}
-#modeTabs{display:flex;gap:4px;background:#0e0e11;border:1px solid var(--line);border-radius:6px;padding:3px}
-#modeTabs button{border:none;background:transparent;border-radius:4px;padding:5px 14px}
-#modeTabs button.active{background:var(--acc);color:#000;font-weight:700}
 
 #main{flex:1;display:flex;min-height:0}
 .panel{background:var(--panel);overflow-y:auto;flex-shrink:0;padding:14px}
 .panel h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-#left{width:250px;border-right:1px solid var(--line)}
-#right{width:300px;border-left:1px solid var(--line)}
+.panel h2:not(:first-child){margin-top:18px}
+#left{width:230px;border-right:1px solid var(--line)}
+#right{width:340px;border-left:1px solid var(--line)}
 #center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;gap:12px;min-width:0}
 #stageWrap{position:relative;border:1px solid var(--line);border-radius:6px;background:#000;display:flex;align-items:center;justify-content:center;max-width:100%;max-height:calc(100vh - 220px);overflow:hidden}
 #stage{display:block;max-width:100%;max-height:calc(100vh - 220px)}
-#dropZone{width:100%;min-height:140px;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim);font-size:11px;text-align:center;cursor:pointer;padding:14px}
-#dropZone:hover{border-color:var(--acc);color:var(--txt)}
-#dropZone.has-file{border-style:solid;border-color:var(--ok);color:var(--txt)}
-.section{margin-bottom:18px}
-.fieldset{border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px}
-.fieldset legend{font-size:10px;color:var(--acc2);text-transform:uppercase;letter-spacing:.06em;padding:0 4px}
 #statusBar{display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--dim);width:100%}
 #statusText{flex:1}
 #progressTrack{flex:1;height:5px;background:#1a1a1f;border-radius:3px;overflow:hidden;display:none}
 #progressTrack.show{display:block}
 #progressFill{height:100%;width:0%;background:var(--acc);transition:width .1s}
-.row2{display:flex;gap:8px}
-.row2>*{flex:1}
-.hint{font-size:9.5px;color:var(--dim);line-height:1.4;margin-top:2px}
-.warn{color:var(--warn)}
-#exportRow{display:flex;gap:8px;width:100%}
-#exportRow button{flex:1}
+#actionRow{display:flex;gap:8px;width:100%;flex-wrap:wrap}
+#actionRow button{flex:1;min-width:90px}
 .hidden{display:none !important}
-a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
+
+/* ---------- camadas ---------- */
+.add-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.add-grid button{padding:7px 4px;font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:3px;border-color:var(--line)}
+.add-grid button:hover{border-color:var(--acc)}
+.add-grid button .ic{font-size:13px}
+.add-grid button .kind{font-size:8.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.add-grid button.add-src{border-left:3px solid var(--src)}
+.add-grid button.add-pix{border-left:3px solid var(--pix)}
+.add-grid button.add-bit{border-left:3px solid var(--bit)}
+
+#layerStack{display:flex;flex-direction:column;gap:6px}
+.layer-card{background:#0e0e11;border:1px solid var(--line);border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:7px;cursor:grab;transition:border-color .12s}
+.layer-card:hover{border-color:#3a3a44}
+.layer-card.dragging{opacity:.4;cursor:grabbing}
+.layer-card.drop-target{border-color:var(--acc);border-style:dashed}
+.layer-card.disabled{opacity:.5}
+.layer-card .lc-head{display:flex;align-items:center;gap:6px}
+.layer-card .lc-handle{color:var(--dim);cursor:grab;font-size:14px;padding:0 4px;user-select:none;-webkit-user-select:none;letter-spacing:-2px;line-height:1}
+.layer-card .lc-eye{width:18px;height:18px;border:none;background:transparent;color:var(--txt);cursor:pointer;font-size:13px;padding:0}
+.layer-card .lc-eye.off{color:var(--dim)}
+.layer-card .lc-minimize{width:20px;height:20px;border:1px solid var(--line);background:#1a1a1f;color:var(--txt);cursor:pointer;font-size:12px;padding:0;line-height:1;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.layer-card .lc-minimize:hover{border-color:var(--acc);color:var(--acc)}
+.layer-card .lc-body{display:flex;flex-direction:column;gap:7px}
+.layer-card .lc-body.collapsed{display:none}
+.layer-card .lc-badge{font-size:9px;padding:2px 5px;border-radius:3px;text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.lc-badge.src{background:var(--src);color:#000}
+.lc-badge.pix{background:var(--pix);color:#000}
+.lc-badge.bit{background:var(--bit);color:#000}
+.layer-card .lc-enc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+.layer-card .lc-enc-dot.fresh{background:var(--ok);box-shadow:0 0 6px rgba(61,220,132,.6)}
+.layer-card .lc-enc-dot.stale{background:#ff2a6d;box-shadow:0 0 6px rgba(255,42,109,.6);animation:pulse-dot 1.4s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.layer-card .lc-name{flex:1;font-size:11.5px;color:var(--txt);background:transparent;border:none;padding:2px 4px;border-radius:3px}
+.layer-card .lc-name:focus{background:#1a1a1f;outline:1px solid var(--acc)}
+.layer-card .lc-del{width:18px;height:18px;border:none;background:transparent;color:var(--dim);cursor:pointer;font-size:13px;padding:0}
+.layer-card .lc-del:hover{color:var(--acc)}
+.layer-card .lc-controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px}
+.layer-card .lc-controls label{display:flex;flex-direction:column;gap:2px;color:var(--dim)}
+.layer-card .lc-controls select,.layer-card .lc-controls input{font-size:10px;padding:3px 5px}
+.layer-card .lc-controls .full{grid-column:1/3}
+.layer-card .lc-controls .lc-clip{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:6px;font-size:10.5px;color:var(--txt);cursor:pointer;margin:2px 0}
+.layer-card .lc-params{border-top:1px solid var(--line);padding-top:6px;display:flex;flex-direction:column;gap:5px}
+.layer-card .lc-params label{font-size:10px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+.layer-card .lc-params label .val{color:var(--acc2);font-weight:600}
+.layer-card .lc-params select,.layer-card .lc-params input[type=text],.layer-card .lc-params input[type=number]{font-size:10.5px;padding:3px 5px}
+.layer-card .lc-params input[type=range]{width:100%}
+.layer-card .lc-transform{display:flex;flex-direction:column;gap:5px;border-top:1px dashed var(--line);padding-top:5px;margin-top:2px}
+.layer-card .lc-transform .lc-stretch-label{display:flex;flex-direction:row;align-items:center;gap:6px;font-size:10.5px;color:var(--txt);cursor:pointer;font-weight:600}
+.layer-card .lc-file{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim)}
+.layer-card .lc-file button{flex:1;font-size:10px;padding:4px}
+.layer-card .lc-mini-tl{position:relative;height:18px;background:#08080a;border:1px solid var(--line);border-radius:3px;overflow:hidden;touch-action:none}
+.layer-card .lc-mini-tl .region{position:absolute;top:0;bottom:0;background:rgba(255,42,109,.32);border-left:2px solid var(--acc);border-right:2px solid var(--acc);cursor:grab}
+.layer-card .lc-mini-tl .region:active{cursor:grabbing}
+.layer-empty{text-align:center;color:var(--dim);font-size:10.5px;padding:30px 10px;line-height:1.5}
+.layer-empty .big{font-size:24px;color:#3a3a44;margin-bottom:8px}
+
+.hint{font-size:9.5px;color:var(--dim);line-height:1.4;margin-top:4px}
+.warn{color:var(--warn)}
 </style>
 </head>
 <body>
 
 <div id="topbar">
   <div id="logo"><span class="dot">●</span> DATAMOSH<span style="color:var(--acc)">TOOL</span></div>
-  <div id="modeTabs">
-    <button id="tabVideo" class="active">Vídeo</button>
-    <button id="tabPhoto">Foto</button>
+  <div class="tb-group">
+    <span class="tb-label">Duração</span>
+    <select id="durSelect">
+      <option value="1">1s</option>
+      <option value="2">2s</option>
+      <option value="3" selected>3s</option>
+      <option value="4">4s</option>
+      <option value="5">5s</option>
+      <option value="6">6s</option>
+      <option value="8">8s</option>
+    </select>
   </div>
-  <div class="spacer"></div>
+  <div class="tb-group">
+    <span class="tb-label">FPS</span>
+    <input type="range" id="fpsRange" min="12" max="30" step="1" value="24" style="width:80px">
+    <span class="val" id="fpsVal" style="color:var(--acc2)">24</span>
+  </div>
   <div class="tb-group">
     <span class="tb-label">Seed</span>
     <input type="number" id="seedInput" value="1" style="width:80px">
     <button id="randSeedBtn" title="Nova seed aleatória">🎲</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="tb-group">
+    <span class="tb-label">Frames</span>
+    <span id="frameCount" style="color:var(--acc2)">—</span>
   </div>
 </div>
 
 <div id="main">
 
   <div id="left" class="panel">
-    <div class="section" id="srcSection">
-      <h2>Fonte</h2>
-      <div id="dropZone">
-        <div id="dropZoneLabel">Solte um vídeo aqui<br>ou clique para escolher</div>
-        <input type="file" id="fileInput" accept="video/*" style="display:none">
-      </div>
-      <div class="hint" id="srcInfo"></div>
+    <h2>Adicionar camada</h2>
+    <div class="add-grid">
+      <button class="add-src" data-add="video"><span class="ic">🎬</span><span>Vídeo</span><span class="kind">fonte</span></button>
+      <button class="add-src" data-add="image"><span class="ic">🖼</span><span>Imagem</span><span class="kind">fonte</span></button>
+      <button class="add-pix" data-add="pixelsort"><span class="ic">▰</span><span>Pixel sort</span><span class="kind">pixel fx</span></button>
+      <button class="add-pix" data-add="rgbshift"><span class="ic">≬</span><span>RGB shift</span><span class="kind">pixel fx</span></button>
+      <button class="add-bit" data-add="melt"><span class="ic">∇</span><span>Melt</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="bloom"><span class="ic">✦</span><span>Bloom</span><span class="kind">bitstream</span></button>
+      <button class="add-bit" data-add="corrupt" style="grid-column:1/3"><span class="ic">⌇</span><span>Corrupt</span><span class="kind">bitstream</span></button>
     </div>
+    <div class="hint" style="margin-top:8px">Fontes produzem pixels. Pixel-fx filtram o composto na posição da pilha. Bitstream-fx atuam pós-encode, em ordem da pilha.</div>
 
-    <div class="section" id="videoTimeSection">
-      <h2>Tempo / Saída</h2>
-      <label class="field">Duração do loop
-        <select id="durSelect">
-          <option value="1">1s</option>
-          <option value="2">2s</option>
-          <option value="3" selected>3s</option>
-          <option value="4">4s</option>
-          <option value="5">5s</option>
-          <option value="6">6s</option>
-          <option value="8">8s</option>
-        </select>
-      </label>
-      <label class="field">Posição no vídeo <span class="val" id="regionVal">0.0s – 3.0s</span></label>
-      <div class="timeline-bar" id="timelineBar">
-        <div class="timeline-region" id="timelineRegion"></div>
-      </div>
-      <div class="hint">Clique na região destacada e arraste para escolher o trecho do vídeo a moshar.</div>
-      <label class="field">FPS <span class="val" id="fpsVal">24</span>
-        <input type="range" id="fpsRange" min="12" max="30" step="1" value="24">
-      </label>
-      <div class="hint">Frames a codificar: <span id="frameCount">—</span></div>
-    </div>
+    <h2>Composição</h2>
+    <label class="field">Largura <input type="number" id="widthInput" value="480" min="32" max="1920" step="2"></label>
+    <label class="field">Altura <input type="number" id="heightInput" value="270" min="32" max="1080" step="2"></label>
+    <label class="row" style="margin-top:4px"><input type="checkbox" id="fitToggle"> Ajustar à próxima fonte carregada</label>
+    <div class="hint" id="sizeHint">Dimensões do quadro de saída.</div>
   </div>
 
   <div id="center">
@@ -132,86 +175,23 @@ a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
       <canvas id="stage" width="480" height="270"></canvas>
     </div>
     <div id="statusBar">
-      <span id="statusText">Pronto.</span>
+      <span id="statusText">Pronto. Adicione camadas à direita →</span>
       <div id="progressTrack"><div id="progressFill"></div></div>
     </div>
-    <div id="exportRow">
+    <div id="actionRow">
       <button id="playPauseBtn" class="ghost" disabled style="flex:0 0 auto">▶</button>
-      <button id="applyBtn" class="primary" disabled>Aplicar datamosh</button>
+      <button id="applyBtn" class="primary" disabled>Aplicar</button>
       <button id="exportMp4Btn" disabled>Exportar MP4</button>
-      <button id="exportPngBtn" class="hidden">Exportar PNG</button>
+      <button id="exportPngBtn" disabled>Exportar PNG</button>
     </div>
   </div>
 
   <div id="right" class="panel">
-    <div id="videoMoshPanel">
-      <h2>Datamosh — Vídeo</h2>
-
-      <div class="fieldset">
-        <legend>Melt (remoção de I-frame)</legend>
-        <label class="row"><input type="checkbox" id="meltEnabled" checked> Ativar melt</label>
-        <label class="field">Cortes (frames, separados por vírgula)
-          <input type="text" id="meltCuts" value="auto" placeholder="ex: 30,60 ou auto">
-        </label>
-        <div class="hint">"auto" = um corte na metade do clipe. Remove o keyframe nesse ponto: a cena seguinte "vaza" sobre a anterior.</div>
-      </div>
-
-      <div class="fieldset">
-        <legend>Bloom (duplicação de P-frame)</legend>
-        <label class="row"><input type="checkbox" id="bloomEnabled"> Ativar bloom</label>
-        <label class="field">Frame-alvo <span class="val" id="bloomTargetVal">10</span>
-          <input type="range" id="bloomTarget" min="1" max="200" value="10">
-        </label>
-        <label class="field">Repetições (Nx) <span class="val" id="bloomCountVal">20</span>
-          <input type="range" id="bloomCount" min="2" max="60" value="20">
-        </label>
-      </div>
-
-      <div class="fieldset">
-        <legend>Corrupção</legend>
-        <label class="row"><input type="checkbox" id="corruptEnabled"> Ativar corrupção</label>
-        <label class="field">Quantidade de frames afetados <span class="val" id="corruptCountVal">3</span>
-          <input type="range" id="corruptCount" min="1" max="15" value="3">
-        </label>
-        <label class="field">Intensidade <span class="val" id="corruptIntensityVal">40</span>
-          <input type="range" id="corruptIntensity" min="0" max="100" value="40">
-        </label>
-        <div class="hint">Intensidade alta demais pode quebrar a decodificação — reduza se o preview parar antes do fim.</div>
-      </div>
-
-      <div class="hint" id="decoderWarn"></div>
-    </div>
-
-    <div id="photoMoshPanel" class="hidden">
-      <h2>Glitch — Foto</h2>
-
-      <div class="fieldset">
-        <legend>Pixel sort (ASDF)</legend>
-        <label class="row"><input type="checkbox" id="sortEnabled" checked> Ativar pixel sort</label>
-        <label class="field">Direção
-          <select id="sortDir"><option value="h">Horizontal</option><option value="v">Vertical</option></select>
-        </label>
-        <label class="field">Critério
-          <select id="sortCriterion"><option value="luma">Luminosidade</option><option value="hue">Matiz</option><option value="sat">Saturação</option></select>
-        </label>
-        <label class="field">Threshold mín. <span class="val" id="sortMinVal">60</span>
-          <input type="range" id="sortMin" min="0" max="255" value="60">
-        </label>
-        <label class="field">Threshold máx. <span class="val" id="sortMaxVal">200</span>
-          <input type="range" id="sortMax" min="0" max="255" value="200">
-        </label>
-      </div>
-
-      <div class="fieldset">
-        <legend>RGB channel shift</legend>
-        <label class="row"><input type="checkbox" id="rgbEnabled"> Ativar deslocamento</label>
-        <label class="field">Ângulo (°) <span class="val" id="rgbAngleVal">0</span>
-          <input type="range" id="rgbAngle" min="0" max="360" value="0">
-        </label>
-        <label class="field">Intensidade (px) <span class="val" id="rgbAmountVal">8</span>
-          <input type="range" id="rgbAmount" min="0" max="60" value="8">
-        </label>
-      </div>
+    <h2>Pilha de camadas <span style="float:right;color:var(--dim);font-weight:400;font-size:9px">efeito ↑ · base ↓</span></h2>
+    <div id="layerStack"></div>
+    <div id="layerEmpty" class="layer-empty">
+      <div class="big">∅</div>
+      Nenhuma camada.<br>Use os botões à esquerda para adicionar fontes e efeitos.
     </div>
   </div>
 
@@ -219,13 +199,13 @@ a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
 
 <script type="module">
 /* ============================================================
-   DATAMOSH TOOL — núcleo
-   Build limpo, feito para datamoshing. Sem geradores/efeitos
-   artísticos portados — só mecanismos de timing/seed/I-O e o
-   núcleo de bitstream (validado empiricamente no Bloco 1).
+   DATAMOSH TOOL — núcleo com sistema de camadas
+   - src layers (vídeo/imagem): produzem pixels por frame
+   - pixel-fx layers (pixelsort/rgbshift): filtram o composto
+   - bitstream-fx layers (melt/bloom/corrupt): atuam pós-encode
    ============================================================ */
 
-/* ---------- RNG com seed (determinismo) ---------- */
+/* ---------- RNG com seed ---------- */
 function hashInt(x){ x = Math.imul(x ^ x>>>16, 0x45d9f3b); x = Math.imul(x ^ x>>>16, 0x45d9f3b); return (x ^ x>>>16)>>>0; }
 function mulberry32(seed){
   let a = seed >>> 0;
@@ -238,7 +218,35 @@ function mulberry32(seed){
 }
 const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
 
-const project = { width: 480, height: 270, fps: 24, duration: 3, seed: 1 };
+/* ---------- projeto + camadas ---------- */
+const project = {
+  width: 480, height: 270, fps: 24, duration: 3, seed: 1,
+  stack: []  // bottom = index 0, top = last
+};
+
+let layerSeq = 0;
+function makeLayer(type){
+  const id = ++layerSeq;
+  const base = { id, type, enabled: true, blend: "source-over", opacity: 1, clip: false, _open: true };
+  // transform comuns a todas as src layers — escalam/posicionam a fonte no canvas
+  const xform = { stretch: false, scale: 1, posX: 0, posY: 0 };
+  switch(type){
+    case "video":      return { ...base, kind:"src",      name:"Vídeo",      file:null, src:null, regionOffset:0, ...xform };
+    case "image":      return { ...base, kind:"src",      name:"Imagem",     file:null, bitmap:null, ...xform };
+    case "melt":       return { ...base, kind:"bitstream",name:"Melt",       cutFrames:"auto" };
+    case "bloom":      return { ...base, kind:"bitstream",name:"Bloom",      targetFrame:10, count:20 };
+    case "corrupt":    return { ...base, kind:"bitstream",name:"Corrupt",    count:3, intensity:40 };
+    case "pixelsort":  return { ...base, kind:"pixelfx",  name:"Pixel sort", dir:"h", criterion:"luma", min:60, max:200 };
+    case "rgbshift":   return { ...base, kind:"pixelfx",  name:"RGB shift",  angle:0, amount:8 };
+  }
+}
+
+const BLENDS = [
+  ["source-over","Normal"],["lighter","Add"],["screen","Screen"],["multiply","Multiply"],
+  ["overlay","Overlay"],["difference","Difference"],["exclusion","Exclusion"],
+  ["hard-light","Hard Light"],["soft-light","Soft Light"],["color-dodge","Dodge"],
+  ["color-burn","Burn"],["darken","Darken"],["lighten","Lighten"]
+];
 
 /* ---------- utils de export ---------- */
 function downloadBlob(blob, name){
@@ -249,14 +257,10 @@ function downloadBlob(blob, name){
 }
 
 /* ============================================================
-   NÚCLEO DE BITSTREAM — Etapa 2 (datamosh real)
-   Parâmetros validados no Bloco 1 (ver docs/PLAN.md §2, DEVLOG.md 2026-06-19)
+   NÚCLEO DE BITSTREAM (Etapa 2) — validado no Bloco 1
    ============================================================ */
+const CODEC = "avc1.42001f";
 
-const CODEC = "avc1.42001f"; // H.264 baseline
-
-/** Codifica uma sequência de frames (drawFrame(i, ctx)) com GOP controlado.
- *  keyFrameIndices: Set de índices que devem ser keyframe (sempre inclui 0). */
 async function encodeFrames(totalFrames, fps, w, h, drawFrame, keyFrameIndices, onProgress){
   const chunks = [];
   let decoderDescription = null;
@@ -278,15 +282,15 @@ async function encodeFrames(totalFrames, fps, w, h, drawFrame, keyFrameIndices, 
     bitrate: Math.min(20_000_000, Math.max(1_500_000, Math.round(W*H*fps*0.12))),
     framerate: fps, latencyMode: "realtime", avc: { format: "avc" }
   });
-
   const canvas = new OffscreenCanvas(W, H);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-
   for (let i = 0; i < totalFrames; i++){
     await drawFrame(i, ctx, W, H);
     const vf = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps) });
     enc.encode(vf, { keyFrame: keyFrameIndices.has(i) });
     vf.close();
+    // Yield periódico para deixar o encoder processar (evita starvation do event loop)
+    if (i % 8 === 7) await new Promise(r => setTimeout(r, 0));
     if (onProgress && i % 4 === 0) onProgress(i / totalFrames * 0.5);
     if (encErr) break;
   }
@@ -296,7 +300,6 @@ async function encodeFrames(totalFrames, fps, w, h, drawFrame, keyFrameIndices, 
   return { chunks, decoderDescription, width: W, height: H };
 }
 
-/** Aplica MELT: remove o(s) keyframe(s) nos índices de corte (mantém o frame 0). */
 function applyMelt(chunks, cutFrameIndices){
   const cuts = new Set(cutFrameIndices);
   let removed = 0;
@@ -308,10 +311,8 @@ function applyMelt(chunks, cutFrameIndices){
   return { chunks: out, removed };
 }
 
-/** Aplica BLOOM: duplica o chunk delta mais próximo de targetIndex, `count` vezes, e retimestampa. */
 function applyBloom(chunks, targetIndex, count, fps){
   let idx = clamp(targetIndex, 1, chunks.length - 1);
-  // acha o delta mais próximo (não pode duplicar um key sem quebrar tudo)
   let probe = idx, dir = 1, tries = 0;
   while (chunks[probe] && chunks[probe].type !== "delta" && tries < chunks.length){
     probe += dir; if (probe < 0 || probe >= chunks.length){ dir = -dir; probe = idx; }
@@ -319,16 +320,17 @@ function applyBloom(chunks, targetIndex, count, fps){
   }
   idx = clamp(probe, 1, chunks.length - 1);
   const dupChunk = chunks[idx];
+  // clone data to avoid shared-reference bugs if a later op mutates in-place
+  const dupClone = { ...dupChunk, data: dupChunk.data.slice() };
   const out = chunks.slice(0, idx + 1)
-    .concat(new Array(count).fill(dupChunk))
+    .concat(new Array(count).fill(dupClone))
     .concat(chunks.slice(idx + 1))
     .map((c, i) => ({ ...c, timestamp: Math.round(i * 1e6 / fps) }));
   return { chunks: out, targetUsed: idx };
 }
 
-/** Aplica CORRUPÇÃO: XOR esparso em N chunks delta (stride mínimo seguro ~15-20, validado no Bloco 1). */
 function applyCorrupt(chunks, count, intensity01, rng){
-  // intensity 0..1 -> stride entre 30 (leve) e 15 (no limite seguro). Abaixo de 15 quebra o decode.
+  if (intensity01 <= 0) return { chunks, affected: [], stride: 0 };
   const stride = Math.round(30 - intensity01 * 15);
   const xorVal = 0x40 + Math.round(intensity01 * 0xB0);
   const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
@@ -347,9 +349,6 @@ function applyCorrupt(chunks, count, intensity01, rng){
   return { chunks: out, affected: [...chosen], stride };
 }
 
-/** Decodifica chunks já moshados, chamando onFrame(VideoFrame) por frame.
- *  hardwareAcceleration:'prefer-hardware' é OBRIGATÓRIO — validado no Bloco 1:
- *  decoder de software aborta em bloom/corrupt por validação estrita de frame_num. */
 function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError){
   let errored = false;
   let decodedCount = 0;
@@ -363,11 +362,14 @@ function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError
     hardwareAcceleration: "prefer-hardware"
   });
   (async () => {
-    for (const c of chunks){
+    for (let i = 0; i < chunks.length; i++){
       if (errored) break;
       try {
-        dec.decode(new EncodedVideoChunk({ type: c.type, timestamp: c.timestamp, duration: c.duration, data: c.data }));
+        dec.decode(new EncodedVideoChunk({ type: chunks[i].type, timestamp: chunks[i].timestamp, duration: chunks[i].duration, data: chunks[i].data }));
       } catch(e){ errored = true; onError && onError("throw:" + e.message, decodedCount); break; }
+      // Yield periódico para deixar o decoder processar (evita starvation do event loop)
+      // mas sem bloquear — sem checagem de decodeQueueSize que pode causar deadlock.
+      if (i % 16 === 15) await new Promise(r => setTimeout(r, 0));
     }
     if (!errored){ try { await dec.flush(); } catch(e){ onError && onError("flush:" + e.message, decodedCount); } }
     try { if (dec.state !== "closed") dec.close(); } catch(e){}
@@ -376,28 +378,20 @@ function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError
 }
 
 /* ============================================================
-   PRODUTOR DE FRAMES — vídeo enviado (demux via Mediabunny/WebCodecs)
-   Decide de propósito NÃO usar <video>+seek: a tag <video> depende do
-   pipeline de mídia do navegador (HTMLMediaElement), que se mostrou
-   pouco confiável em testes. Demuxar com Mediabunny (que já usamos
-   para o export) e decodificar via WebCodecs é o caminho consistente
-   com o resto do núcleo — mesma tecnologia ponta a ponta.
+   PRODUTOR DE FRAMES — vídeo via Mediabunny demux
    ============================================================ */
-
 let _mbModule = null;
 async function loadMediabunny(){
   if (!_mbModule) _mbModule = await import("https://cdn.jsdelivr.net/npm/mediabunny/+esm");
   return _mbModule;
 }
 
-/** Carrega um arquivo de vídeo via demux (não usa <video>).
- *  Retorna { input, track, duration, width, height, sink, getFrameCanvas(t) }. */
 async function loadVideoFile(file){
   const mb = await loadMediabunny();
   const { Input, ALL_FORMATS, BlobSource, CanvasSink } = mb;
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
   const track = await input.getPrimaryVideoTrack();
-  if (!track) throw new Error("Nenhuma faixa de vídeo encontrada no arquivo.");
+  if (!track) throw new Error("Nenhuma faixa de vídeo.");
   const duration = await input.computeDuration();
   const width = track.displayWidth, height = track.displayHeight;
   const sink = new CanvasSink(track, { width, height, fit: "fill" });
@@ -411,9 +405,8 @@ async function loadVideoFile(file){
 }
 
 /* ============================================================
-   GLITCH DE IMAGEM (Etapa 1 — pixel-level, código novo)
+   GLITCH DE IMAGEM (Etapa 1 — pixel-level)
    ============================================================ */
-
 function luma(r,g,b){ return 0.2126*r + 0.7152*g + 0.0722*b; }
 function rgb2hue(r,g,b){
   r/=255; g/=255; b/=255;
@@ -431,8 +424,6 @@ function rgb2sat(r,g,b){
   return max===0 ? 0 : (max-min)/max;
 }
 
-/** Pixel sort estilo ASDF (Kim Asendorf): por linha/coluna, ordena trechos
- *  delimitados por threshold[min,max] do critério escolhido. */
 function pixelSort(imgData, w, h, opts){
   const { dir, criterion, min, max } = opts;
   const d = imgData.data;
@@ -460,15 +451,12 @@ function pixelSort(imgData, w, h, opts){
       }
     }
   }
-  if (dir === "h"){
-    for (let y=0;y<h;y++) sortRun((x)=> (y*w+x)*4, w);
-  } else {
-    for (let x=0;x<w;x++) sortRun((y)=> (y*w+x)*4, h);
-  }
+  if (dir === "h"){ for (let y=0;y<h;y++) sortRun((x)=> (y*w+x)*4, w); }
+  else            { for (let x=0;x<w;x++) sortRun((y)=> (y*w+x)*4, h); }
 }
 
-/** Desloca canais R/G/B por um vetor (ângulo+intensidade), wrap nas bordas. */
 function rgbShift(imgData, w, h, angleDeg, amount){
+  if (amount <= 0) return;
   const src = new Uint8ClampedArray(imgData.data);
   const d = imgData.data;
   const rad = angleDeg * Math.PI / 180;
@@ -487,18 +475,184 @@ function rgbShift(imgData, w, h, angleDeg, amount){
 }
 
 /* ============================================================
+   COMPOSIÇÃO DE FRAMES (Etapa 1)
+   ============================================================
+   - src layers: renderizam para um canvas próprio; são compostas com blend/opacity/clip
+   - pixel-fx layers: aplicam filtro ao composto ATUAL (resultado do que está abaixo no painel)
+   - bitstream-fx layers: PULADAS aqui (atuam depois do encode)
+*/
+/* Composição de frames (Etapa 1) — percorre a pilha BOTTOM-UP
+   (da base do painel para o topo). Cada camada afeta o que está ABAIXO
+   dela no painel, então o fluxo é: fontes (base) desenham primeiro,
+   depois efeitos (acima) transformam o resultado acumulado.
+   - src layers: desenham no canvas com blend/opacity/clip
+   - pixel-fx layers: filtram o composto ATUAL (resultado de tudo que está abaixo no painel)
+   - bitstream-fx layers: PULADAS aqui (atuam depois do encode) */
+async function renderFrame(i, ctx, w, h, total){
+  ctx.clearRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+
+  // bottom-up: último índice (base do painel) primeiro, índice 0 (topo) por último
+  for (let li = project.stack.length - 1; li >= 0; li--){
+    const layer = project.stack[li];
+    if (!layer.enabled) continue;
+    if (layer.kind === "bitstream") continue; // não renderiza por frame
+
+    if (layer.kind === "pixelfx"){
+      // Aplica o filtro ao composto atual. Opacity vira "força" via blend com a versão original.
+      const snapshot = ctx.getImageData(0, 0, w, h);
+      if (layer.type === "pixelsort"){
+        pixelSort(snapshot, w, h, { dir: layer.dir, criterion: layer.criterion, min: +layer.min, max: +layer.max });
+      } else if (layer.type === "rgbshift"){
+        rgbShift(snapshot, w, h, +layer.angle, +layer.amount);
+      }
+      // Se opacity < 1, mescla o original com o filtrado
+      if (layer.opacity < 1){
+        const original = ctx.getImageData(0, 0, w, h);
+        const a = layer.opacity;
+        const od = original.data, sd = snapshot.data;
+        for (let k=0;k<od.length;k++) od[k] = od[k]*(1-a) + sd[k]*a;
+        ctx.putImageData(original, 0, 0);
+      } else {
+        ctx.putImageData(snapshot, 0, 0);
+      }
+      continue;
+    }
+
+    // src layer: renderiza para offscreen aplicando transform (stretch/scale/pos)
+    const layerCanvas = new OffscreenCanvas(w, h);
+    const lctx = layerCanvas.getContext("2d");
+    let drew = false;
+
+    // busca a fonte (frame de vídeo ou bitmap) e desenha direto com transform
+    // (sem canvas temporário — drawImage do frameCanvas/bitmap direto no layerCanvas)
+    if (layer.type === "video" && layer.src){
+      const t = layer.regionOffset + (i / Math.max(1, total-1)) * project.duration;
+      const frameCanvas = await layer.src.getFrameCanvas(Math.min(Math.max(0,t), layer.src.duration - 0.001));
+      if (frameCanvas){
+        drawSourceWithTransform(lctx, frameCanvas, frameCanvas.width, frameCanvas.height, w, h, layer);
+        drew = true;
+      }
+    } else if (layer.type === "image" && layer.bitmap){
+      drawSourceWithTransform(lctx, layer.bitmap, layer.bitmap.width, layer.bitmap.height, w, h, layer);
+      drew = true;
+    }
+
+    if (!drew) continue;
+
+    // clip: usa o alfa do composto atual como máscara
+    if (layer.clip){
+      const clipped = new OffscreenCanvas(w, h);
+      const cctx = clipped.getContext("2d");
+      cctx.drawImage(layerCanvas, 0, 0);
+      cctx.globalCompositeOperation = "destination-in";
+      cctx.drawImage(ctx.canvas, 0, 0);
+      ctx.globalAlpha = layer.opacity;
+      ctx.globalCompositeOperation = layer.blend;
+      ctx.drawImage(clipped, 0, 0);
+    } else {
+      ctx.globalAlpha = layer.opacity;
+      ctx.globalCompositeOperation = layer.blend;
+      ctx.drawImage(layerCanvas, 0, 0);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  }
+}
+
+/* Desenha a fonte no lctx aplicando as transforms:
+   - stretch=true: preenche o canvas inteiro (drawImage(source, 0,0,w,h)) — ignora escala/posição
+   - stretch=false: escala preservando proporção, posicionada por posX/posY (centro = 0,0)
+     scale 1 = tamanho original; posX/posY em pixels do canvas */
+function drawSourceWithTransform(lctx, srcCanvas, srcW, srcH, dstW, dstH, layer){
+  lctx.clearRect(0, 0, dstW, dstH);
+  if (layer.stretch){
+    lctx.drawImage(srcCanvas, 0, 0, dstW, dstH);
+    return;
+  }
+  const scale = Math.max(0.001, +layer.scale || 1);
+  const drawW = srcW * scale;
+  const drawH = srcH * scale;
+  // posX/posY são offsets em pixels do canvas, relativos ao centro
+  const dx = (dstW - drawW) / 2 + (+layer.posX || 0);
+  const dy = (dstH - drawH) / 2 + (+layer.posY || 0);
+  lctx.drawImage(srcCanvas, dx, dy, drawW, drawH);
+}
+
+/* ---------- coleta pontos de corte de todas as melt layers ---------- */
+function parseCutFrames(cutStr, total){
+  const s = (cutStr || "").trim();
+  if (s === "" || s === "auto") return [Math.floor(total/2)];
+  return s.split(",").map(x => parseInt(x.trim(), 10))
+    .filter(x => !isNaN(x) && x > 0 && x < total);
+}
+function allCutPoints(total){
+  const cuts = new Set();
+  for (let li = 0; li < project.stack.length; li++){
+    const layer = project.stack[li];
+    if (layer.type !== "melt" || !layer.enabled) continue;
+    parseCutFrames(layer.cutFrames, total).forEach(c => cuts.add(c));
+  }
+  return [...cuts];
+}
+
+/* ---------- aplica bitstream layers BOTTOM-UP (base do painel → topo) ----------
+   Cada camada afeta o que está abaixo dela no painel; logo, efeitos mais
+   ao topo do painel são aplicados por último (sobre o resultado acumulado). */
+function applyBitstreamLayers(chunks, fps, rng){
+  let working = chunks;
+  const notes = [];
+  for (let li = project.stack.length - 1; li >= 0; li--){
+    const layer = project.stack[li];
+    if (!layer.enabled || layer.kind !== "bitstream") continue;
+    if (layer.type === "melt"){
+      const cuts = parseCutFrames(layer.cutFrames, working.length);
+      const r = applyMelt(working, cuts);
+      working = r.chunks;
+      notes.push(`melt(${cuts.join(",")}): -${r.removed} keys`);
+    } else if (layer.type === "bloom"){
+      const r = applyBloom(working, +layer.targetFrame, +layer.count, fps);
+      working = r.chunks;
+      notes.push(`bloom(@${r.targetUsed}×${layer.count})`);
+    } else if (layer.type === "corrupt"){
+      const r = applyCorrupt(working, +layer.count, (+layer.intensity)/100, rng);
+      working = r.chunks;
+      notes.push(`corrupt(${r.affected.length} frames, stride ${r.stride})`);
+    }
+  }
+  return { chunks: working, notes };
+}
+
+/* ============================================================
    ESTADO DA UI
    ============================================================ */
-
 const $ = (id) => document.getElementById(id);
-let mode = "video";          // "video" | "photo"
-let videoFile = null, videoSrc = null; // videoSrc = { input, track, duration, width, height, getFrameCanvas }
-let imageFile = null, imageBitmap = null;
-let lastMoshResult = null;   // { chunks, decoderDescription, width, height, fps }
-let lastPhotoResult = null;  // canvas with the glitched image
-let regionOffset = 0;        // início do trecho usado, em segundos a partir do começo do vídeo
-let cachedEncode = null;     // { chunks, decoderDescription, width, height, fps, cutIdx, total, sig } — etapa lenta cacheada
-let previewPlaying = true;   // estado do play/pause, preservado entre reaplicações de mosh
+let lastMoshResult = null;
+let lastStaticCanvas = null;  // para export PNG (modo sem vídeo/bitstream)
+let cachedEncode = null;
+
+/* Sistema de playback separado do processamento.
+   - applyAll: processa (encode + mosh + decode) → armazena frames → desenha 1º frame. NÃO toca.
+   - Play/Pause: controla reprodução dos frames processados.
+   - currentDecodedFrames: frames prontos para tocar (Mode 2). Vazio em Mode 1 (realtime).
+   - currentPlaybackPlayer: o loop ativo (ou null se pausado). */
+let currentDecodedFrames = [];
+let currentPlaybackPlayer = null;
+
+function stopPlayback(){
+  if (currentPlaybackPlayer) currentPlaybackPlayer.cancelled = true;
+  currentPlaybackPlayer = null;
+}
+function isPlaying(){ return currentPlaybackPlayer !== null && !currentPlaybackPlayer.cancelled; }
+
+/** Invalida o cache do encode e atualiza o indicador vermelho/verde das camadas bitstream.
+ *  Chamar sempre que algo mudar que exija re-codificação (params de src/pixelfx/região/dims/fps/cortes). */
+function invalidateEncode(){
+  cachedEncode = null;
+  // só atualiza os pontos (não destrói inputs do painel)
+  refreshEncDots();
+}
 
 function setStatus(text){ $("statusText").textContent = text; }
 function setProgress(p){
@@ -508,356 +662,759 @@ function setProgress(p){
   fill.style.width = clamp(p,0,1)*100 + "%";
 }
 
-/** Ajusta project.width/height para caber a proporção da fonte (vídeo OU foto)
- *  dentro de um quadro máximo — mesma lógica para os dois modos. */
+/* Sistema de preview simples: em vez de tokens (que eram frágeis e causavam race conditions),
+   usamos uma referência ao player atual. Quando um novo player inicia, ele cancela o anterior
+   setando `cancelled = true`. O loop do player antigo vê a flag e para. */
+
+function hasVideoLayer(){ return project.stack.some(l => l.type === "video" && l.src); }
+function hasBitstreamLayer(){ return project.stack.some(l => l.kind === "bitstream" && l.enabled); }
+
+/** Verifica se o encode em cache está atualizado para o estado atual das camadas.
+ *  Usado para o indicador vermelho/verde nas camadas bitstream:
+ *  - sem camadas bitstream → sempre "fresh" (não precisa de encode)
+ *  - com bitstream: fresh se cachedEncode existe e assinatura bate com estado atual */
+function isBitstreamEncodeFresh(){
+  if (!hasBitstreamLayer()) return true;
+  if (!cachedEncode) return false;
+  const total = Math.max(1, Math.round(project.duration * project.fps));
+  const sig = encodeSignature(total);
+  return cachedEncode.sig === sig;
+}
+function hasAnySrc(){ return project.stack.some(l => l.kind === "src" && l.enabled && (l.src || l.bitmap)); }
+
+/* ---------- ajustar dimensões à próxima fonte ---------- */
+let fitOnNextLoad = false;
+// checkbox persiste o estado — fica marcado enquanto o usuário quiser auto-ajustar
+$("fitToggle").onchange = (e) => {
+  fitOnNextLoad = e.target.checked;
+  if (fitOnNextLoad) setStatus("Próxima fonte carregada vai redimensionar o quadro.");
+};
 function fitProjectSize(srcW, srcH, maxDim){
   maxDim = maxDim || 480;
   const ar = srcW / srcH;
-  project.width = ar >= 1 ? maxDim : Math.round(maxDim * ar);
-  project.height = ar >= 1 ? Math.round(maxDim / ar) : maxDim;
+  const w = ar >= 1 ? maxDim : Math.round(maxDim * ar);
+  const h = ar >= 1 ? Math.round(maxDim / ar) : maxDim;
+  project.width = Math.round(w/2)*2;
+  project.height = Math.round(h/2)*2;
+  $("widthInput").value = project.width;
+  $("heightInput").value = project.height;
 }
 
-/** Invalida qualquer loop de preview (rAF) em andamento — chamado ao trocar de
- *  modo ou carregar um novo arquivo, para o frame antigo parar de ser desenhado
- *  por cima do conteúdo novo (canvas é compartilhado entre os dois modos). */
-let previewLoopToken = 0;
-function stopPreviewLoop(){ previewLoopToken++; }
+/* ============================================================
+   UI DA PILHA
+   ============================================================ */
+const layerStackEl = $("layerStack");
+const layerEmptyEl = $("layerEmpty");
 
-/* ---------- tabs de modo ---------- */
-$("tabVideo").onclick = () => setMode("video");
-$("tabPhoto").onclick = () => setMode("photo");
-function setMode(m){
-  stopPreviewLoop(); // o canvas é compartilhado entre os dois modos
-  mode = m;
-  $("tabVideo").classList.toggle("active", m==="video");
-  $("tabPhoto").classList.toggle("active", m==="photo");
-  $("videoTimeSection").classList.toggle("hidden", m!=="video");
-  $("videoMoshPanel").classList.toggle("hidden", m!=="video");
-  $("photoMoshPanel").classList.toggle("hidden", m!=="photo");
-  $("exportMp4Btn").classList.toggle("hidden", m!=="video");
-  $("exportPngBtn").classList.toggle("hidden", m!=="photo");
-  $("fileInput").accept = m==="video" ? "video/*" : "image/*";
-  $("dropZoneLabel").innerHTML = m==="video"
-    ? "Solte um vídeo aqui<br>ou clique para escolher"
-    : "Solte uma foto aqui<br>ou clique para escolher";
-  $("dropZone").classList.remove("has-file");
-  $("applyBtn").disabled = true;
-  $("exportMp4Btn").disabled = true;
-  $("playPauseBtn").disabled = true;
-  $("playPauseBtn").classList.toggle("hidden", m!=="video");
-  setStatus("Pronto.");
-  drawPlaceholder();
+function renderLayerStack(){
+  layerStackEl.innerHTML = "";
+  if (project.stack.length === 0){
+    layerEmptyEl.style.display = "block";
+  } else {
+    layerEmptyEl.style.display = "none";
+    // index 0 = topo do painel = último efeito aplicado; último índice = base (fonte)
+    // cada camada afeta o que está ABAIXO dela no painel
+    for (let i = 0; i < project.stack.length; i++){
+      layerStackEl.appendChild(buildLayerCard(project.stack[i], i));
+    }
+  }
+  updateActionButtons();
+  refreshEncDots(); // garante estado correto dos pontos após render
 }
 
+function buildLayerCard(layer, index){
+  const card = document.createElement("div");
+  card.className = "layer-card" + (layer.enabled ? "" : " disabled");
+  card.dataset.id = layer.id;
+  card.draggable = true;
+
+  const badge = { src:"src", pix:"pix", bit:"bit" }[layer.kind];
+  const kindLabel = { src:"fonte", pix:"pixel fx", bit:"bitstream" }[layer.kind];
+
+  card.innerHTML = `
+    <div class="lc-head">
+      <span class="lc-handle" title="Arraste para reordenar">⋮⋮</span>
+      <button class="lc-eye ${layer.enabled?"":"off"}" title="Ligar/desligar">${layer.enabled?"👁":"—"}</button>
+      <span class="lc-badge ${badge}">${kindLabel}</span>
+      ${layer.kind === "bitstream" ? `<span class="lc-enc-dot ${isBitstreamEncodeFresh() ? "fresh" : "stale"}" title="${isBitstreamEncodeFresh() ? "Encode atualizado" : "Encode pendente — será codificado ao aplicar"}"></span>` : ""}
+      <input class="lc-name" value="${layer.name.replace(/"/g,"&quot;")}">
+      <button class="lc-minimize" title="${layer._open?"Minimizar":"Expandir"}">${layer._open?"▾":"▸"}</button>
+      <button class="lc-del" title="Remover">✕</button>
+    </div>
+    <div class="lc-body ${layer._open?"":"collapsed"}">
+      <div class="lc-controls">
+        <label>Blend
+          <select class="lc-blend">
+            ${BLENDS.map(([v,n])=>`<option value="${v}" ${layer.blend===v?"selected":""}>${n}</option>`).join("")}
+          </select>
+        </label>
+        <label>Opacity <span class="val lc-opacity-val">${Math.round(layer.opacity*100)}%</span>
+          <input type="range" class="lc-opacity" min="0" max="100" value="${Math.round(layer.opacity*100)}">
+        </label>
+        <label class="lc-clip ${layer.kind==="pixelfx"?"hidden":""}" style="grid-column:1/3">
+          <input type="checkbox" class="lc-clip-input" ${layer.clip?"checked":""}> Máscara de recorte
+        </label>
+      </div>
+      <div class="lc-params"></div>
+    </div>
+  `;
+
+  // Eventos
+  card.querySelector(".lc-eye").onclick = () => {
+    layer.enabled = !layer.enabled;
+    renderLayerStack();
+    scheduleAutoApply();
+  };
+  card.querySelector(".lc-name").onchange = (e) => { layer.name = e.target.value; };
+  card.querySelector(".lc-minimize").onclick = () => {
+    layer._open = !layer._open;
+    card.querySelector(".lc-body").classList.toggle("collapsed", !layer._open);
+    card.querySelector(".lc-minimize").textContent = layer._open ? "▾" : "▸";
+    card.querySelector(".lc-minimize").title = layer._open ? "Minimizar" : "Expandir";
+  };
+  card.querySelector(".lc-del").onclick = () => {
+    // libera recursos
+    if (layer.src) try { layer.src.input.remove(); } catch(e){}
+    if (layer.bitmap) try { layer.bitmap.close(); } catch(e){}
+    project.stack = project.stack.filter(l => l.id !== layer.id);
+    renderLayerStack();
+    scheduleAutoApply();
+  };
+  card.querySelector(".lc-blend").onchange = (e) => { layer.blend = e.target.value; scheduleAutoApply(); };
+  card.querySelector(".lc-opacity").oninput = (e) => {
+    layer.opacity = (+e.target.value)/100;
+    card.querySelector(".lc-opacity-val").textContent = e.target.value + "%";
+    scheduleAutoApply();
+  };
+  card.querySelector(".lc-clip-input").onchange = (e) => { layer.clip = e.target.checked; scheduleAutoApply(); };
+
+  // Drag-reorder: SÓ o handle dispara o drag (não os inputs/sliders/selects)
+  card.draggable = false;
+  const handle = card.querySelector(".lc-handle");
+  if (handle){
+    handle.draggable = true;
+    handle.addEventListener("dragstart", (e) => {
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(layer.id));
+    });
+    handle.addEventListener("dragend", () => {
+      card.classList.remove("dragging");
+      [...layerStackEl.children].forEach(c => c.classList.remove("drop-target"));
+    });
+  }
+  // segurança extra: qualquer interação com inputs dentro do card não inicia drag
+  card.addEventListener("dragstart", (e) => {
+    if (e.target !== handle) e.preventDefault();
+  });
+  card.addEventListener("dragend", () => {
+    card.classList.remove("dragging");
+    [...layerStackEl.children].forEach(c => c.classList.remove("drop-target"));
+  });
+  card.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  });
+  card.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    card.classList.add("drop-target");
+  });
+  card.addEventListener("dragleave", () => card.classList.remove("drop-target"));
+  card.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const draggedId = +e.dataTransfer.getData("text/plain");
+    if (draggedId === layer.id) return;
+    const fromIdx = project.stack.findIndex(l => l.id === draggedId);
+    const toIdx = project.stack.findIndex(l => l.id === layer.id);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = project.stack.splice(fromIdx, 1);
+    project.stack.splice(toIdx, 0, moved);
+    renderLayerStack();
+    scheduleAutoApply();
+  });
+
+  // Params específicos do tipo
+  const paramsEl = card.querySelector(".lc-params");
+  buildLayerParams(paramsEl, layer);
+
+  return card;
+}
+
+/* Bloco de transform para src layers — stretch, scale, posX, posY.
+   Retornada como string HTML; o bind dos eventos é feito por bindTransformEvents. */
+function transformBlockHTML(layer){
+  return `
+    <div class="lc-transform">
+      <label class="lc-stretch-label">
+        <input type="checkbox" class="lc-stretch" ${layer.stretch?"checked":""}> Stretch to canvas
+      </label>
+      <label>Escala <span class="val lc-scale-val">${(+layer.scale).toFixed(2)}×</span>
+        <input type="range" class="lc-scale" min="0.05" max="4" step="0.01" value="${layer.scale}">
+      </label>
+      <label>Posição X <span class="val lc-posx-val">${Math.round(layer.posX)}px</span>
+        <input type="range" class="lc-posx" min="-960" max="960" step="1" value="${layer.posX}">
+      </label>
+      <label>Posição Y <span class="val lc-posy-val">${Math.round(layer.posY)}px</span>
+        <input type="range" class="lc-posy" min="-540" max="540" step="1" value="${layer.posY}">
+      </label>
+    </div>
+  `;
+}
+
+/* Faz o bind dos eventos do bloco de transform.
+   - stretch=true desabilita scale/posX/posY (não faz sentido esticando)
+   - Mudou qualquer param → redesenha 1º frame no canvas (preview estático, sem aplicar)
+     para o usuário ver o efeito imediatamente */
+function bindTransformEvents(container, layer){
+  const stretchInput = container.querySelector(".lc-stretch");
+  const scaleInput = container.querySelector(".lc-scale");
+  const posxInput = container.querySelector(".lc-posx");
+  const posyInput = container.querySelector(".lc-posy");
+  const scaleVal = container.querySelector(".lc-scale-val");
+  const posxVal = container.querySelector(".lc-posx-val");
+  const posyVal = container.querySelector(".lc-posy-val");
+
+  function syncDisabled(){
+    const dis = layer.stretch;
+    scaleInput.disabled = dis;
+    posxInput.disabled = dis;
+    posyInput.disabled = dis;
+    scaleInput.parentElement.style.opacity = dis ? ".4" : "1";
+    posxInput.parentElement.style.opacity = dis ? ".4" : "1";
+    posyInput.parentElement.style.opacity = dis ? ".4" : "1";
+  }
+  // Redesenha o 1º frame da fonte no canvas aplicando as transforms atuais.
+  // NÃO chama applyAll — só mostra o preview estático do frame 0 com a transform.
+  // Se já tem um resultado processado (currentDecodedFrames), não sobrescreve.
+  function redrawSourcePreview(){
+    if (currentDecodedFrames.length > 0) return; // tem processamento ativo, não mexer
+    if (isPlaying()) return; // está tocando, não interromper
+    drawSourceFirstFrame(layer);
+  }
+  stretchInput.onchange = (e) => {
+    layer.stretch = e.target.checked;
+    syncDisabled();
+    redrawSourcePreview();
+    refreshEncDots();
+  };
+  scaleInput.oninput = (e) => {
+    layer.scale = +e.target.value;
+    scaleVal.textContent = layer.scale.toFixed(2) + "×";
+    redrawSourcePreview();
+  };
+  posxInput.oninput = (e) => {
+    layer.posX = +e.target.value;
+    posxVal.textContent = Math.round(layer.posX) + "px";
+    redrawSourcePreview();
+  };
+  posyInput.oninput = (e) => {
+    layer.posY = +e.target.value;
+    posyVal.textContent = Math.round(layer.posY) + "px";
+    redrawSourcePreview();
+  };
+  syncDisabled();
+}
+
+/** Desenha o 1º frame da camada fonte no canvas, aplicando suas transforms.
+ *  Usado quando o usuário mexe em stretch/scale/posX/posY sem ter clicado Aplicar. */
+async function drawSourceFirstFrame(layer){
+  try {
+    let srcCanvas = null, srcW = 0, srcH = 0;
+    if (layer.type === "video" && layer.src){
+      srcCanvas = await layer.src.getFrameCanvas(0);
+      if (srcCanvas){ srcW = srcCanvas.width; srcH = srcCanvas.height; }
+    } else if (layer.type === "image" && layer.bitmap){
+      srcCanvas = layer.bitmap;
+      srcW = layer.bitmap.width; srcH = layer.bitmap.height;
+    }
+    if (!srcCanvas) return;
+    const c = $("stage");
+    c.width = project.width; c.height = project.height;
+    const ctx = c.getContext("2d");
+    ctx.clearRect(0, 0, project.width, project.height);
+    const layerCanvas = new OffscreenCanvas(project.width, project.height);
+    const lctx = layerCanvas.getContext("2d");
+    drawSourceWithTransform(lctx, srcCanvas, srcW, srcH, project.width, project.height, layer);
+    ctx.drawImage(layerCanvas, 0, 0);
+  } catch(e){ console.warn("drawSourceFirstFrame failed", e); }
+}
+
+function buildLayerParams(container, layer){
+  container.innerHTML = "";
+  if (layer.type === "video"){
+    container.innerHTML = `
+      <div class="lc-file">
+        <button class="lc-load">📁 ${layer.file ? "Trocar vídeo" : "Carregar vídeo"}</button>
+        <span class="lc-fileinfo">${layer.src ? `${layer.src.width}×${layer.src.height} · ${layer.src.duration.toFixed(1)}s` : "—"}</span>
+        <input type="file" accept="video/*" class="lc-fileinput" style="display:none">
+      </div>
+      <label>Offset no vídeo (s) <span class="val lc-offset-val">${layer.regionOffset.toFixed(2)}</span>
+        <input type="range" class="lc-offset" min="0" max="60" step="0.05" value="${layer.regionOffset}">
+      </label>
+      <div class="lc-mini-tl"><div class="region"></div></div>
+      <div class="hint">A janela de ${project.duration}s começa neste offset dentro do vídeo fonte.</div>
+      ${transformBlockHTML(layer)}
+    `;
+    const fileInput = container.querySelector(".lc-fileinput");
+    container.querySelector(".lc-load").onclick = () => fileInput.click();
+    fileInput.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      setStatus("Carregando vídeo (demux)…");
+      try {
+        const loaded = await loadVideoFile(f);
+        layer.src = loaded;
+        layer.file = f;
+        if (fitOnNextLoad){ fitProjectSize(loaded.width, loaded.height); }
+        renderLayerStack();
+        // Desenha o 1º frame no canvas para o usuário ver que o vídeo carregou.
+        // NÃO chama applyAll — usuário clica Aplicar quando quiser ver o resultado.
+        // Respeita as transforms da camada (stretch/scale/posX/posY) — sem isso, fazia stretch ignorando os params.
+        try {
+          const frameCanvas = await loaded.getFrameCanvas(0);
+          if (frameCanvas){
+            const c = $("stage");
+            c.width = project.width; c.height = project.height;
+            const ctx = c.getContext("2d");
+            ctx.clearRect(0, 0, project.width, project.height);
+            // usa drawSourceWithTransform — respeita stretch=false (preserva proporção), scale, posX, posY
+            const layerCanvas = new OffscreenCanvas(project.width, project.height);
+            const lctx = layerCanvas.getContext("2d");
+            drawSourceWithTransform(lctx, frameCanvas, frameCanvas.width, frameCanvas.height, project.width, project.height, layer);
+            ctx.drawImage(layerCanvas, 0, 0);
+          }
+        } catch(e){}
+        setStatus("Vídeo carregado. Ajuste os parâmetros e clique Aplicar.");
+        refreshEncDots();
+      } catch(err){ setStatus("Erro ao carregar vídeo: " + err.message); }
+    };
+    const offsetInput = container.querySelector(".lc-offset");
+    const offsetVal = container.querySelector(".lc-offset-val");
+    const region = container.querySelector(".lc-mini-tl .region");
+    function updateOffsetUI(){
+      offsetVal.textContent = layer.regionOffset.toFixed(2) + "s";
+      const srcDur = layer.src ? layer.src.duration : 0;
+      const maxOff = Math.max(0, srcDur - project.duration);
+      const pct = srcDur > 0 ? (layer.regionOffset / srcDur) * 100 : 0;
+      const wPct = srcDur > 0 ? (project.duration / srcDur) * 100 : 100;
+      region.style.left = clamp(pct,0,100) + "%";
+      region.style.width = clamp(wPct,0,100-pct) + "%";
+    }
+    offsetInput.oninput = (e) => {
+      layer.regionOffset = +e.target.value;
+      if (layer.src) layer.regionOffset = clamp(layer.regionOffset, 0, Math.max(0, layer.src.duration - project.duration));
+      updateOffsetUI();
+      scheduleAutoApply();
+    };
+    // mini-tl drag
+    const miniTl = container.querySelector(".lc-mini-tl");
+    let dragging = false, startX = 0, startOff = 0;
+    region.addEventListener("pointerdown", (e) => {
+      if (!layer.src) return;
+      dragging = true; startX = e.clientX; startOff = layer.regionOffset;
+      region.setPointerCapture(e.pointerId);
+    });
+    region.addEventListener("pointermove", (e) => {
+      if (!dragging || !layer.src) return;
+      const w = miniTl.getBoundingClientRect().width || 1;
+      const delta = ((e.clientX - startX) / w) * layer.src.duration;
+      layer.regionOffset = clamp(startOff + delta, 0, Math.max(0, layer.src.duration - project.duration));
+      offsetInput.value = layer.regionOffset;
+      updateOffsetUI();
+      scheduleAutoApply();
+    });
+    const endDrag = () => { dragging = false; };
+    region.addEventListener("pointerup", endDrag);
+    region.addEventListener("pointercancel", endDrag);
+    updateOffsetUI();
+    bindTransformEvents(container, layer);
+  }
+  else if (layer.type === "image"){
+    container.innerHTML = `
+      <div class="lc-file">
+        <button class="lc-load">📁 ${layer.file ? "Trocar imagem" : "Carregar imagem"}</button>
+        <span class="lc-fileinfo">${layer.bitmap ? `${layer.bitmap.width}×${layer.bitmap.height}` : "—"}</span>
+        <input type="file" accept="image/*" class="lc-fileinput" style="display:none">
+      </div>
+      ${transformBlockHTML(layer)}
+    `;
+    const fileInput = container.querySelector(".lc-fileinput");
+    container.querySelector(".lc-load").onclick = () => fileInput.click();
+    fileInput.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try {
+        const bmp = await createImageBitmap(f);
+        layer.bitmap = bmp;
+        layer.file = f;
+        if (fitOnNextLoad){ fitProjectSize(bmp.width, bmp.height); }
+        renderLayerStack();
+        // Desenha a imagem no canvas para o usuário ver que carregou.
+        // Respeita as transforms da camada (stretch/scale/posX/posY).
+        try {
+          const c = $("stage");
+          c.width = project.width; c.height = project.height;
+          const ctx = c.getContext("2d");
+          ctx.clearRect(0, 0, project.width, project.height);
+          const layerCanvas = new OffscreenCanvas(project.width, project.height);
+          const lctx = layerCanvas.getContext("2d");
+          drawSourceWithTransform(lctx, bmp, bmp.width, bmp.height, project.width, project.height, layer);
+          ctx.drawImage(layerCanvas, 0, 0);
+        } catch(e){}
+        setStatus("Imagem carregada. Ajuste os parâmetros e clique Aplicar.");
+        refreshEncDots();
+      } catch(err){ setStatus("Erro ao carregar imagem: " + err.message); }
+    };
+    bindTransformEvents(container, layer);
+  }
+  else if (layer.type === "melt"){
+    container.innerHTML = `
+      <label>Cortes (frames) — vírgula separa, "auto" = meio
+        <input type="text" class="lc-cuts" value="${layer.cutFrames}">
+      </label>
+      <div class="hint">Remove o keyframe no corte: a cena seguinte "vaza" sobre a anterior.</div>
+    `;
+    container.querySelector(".lc-cuts").oninput = (e) => { layer.cutFrames = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "bloom"){
+    container.innerHTML = `
+      <label>Frame-alvo <span class="val lc-target-val">${layer.targetFrame}</span>
+        <input type="range" class="lc-target" min="1" max="200" value="${layer.targetFrame}">
+      </label>
+      <label>Repetições (Nx) <span class="val lc-count-val">${layer.count}</span>
+        <input type="range" class="lc-count" min="2" max="60" value="${layer.count}">
+      </label>
+      <div class="hint">Duplica um P-frame N vezes — pixels esticam/pulsam.</div>
+    `;
+    container.querySelector(".lc-target").oninput = (e) => { layer.targetFrame = +e.target.value; container.querySelector(".lc-target-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-count").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-count-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "corrupt"){
+    container.innerHTML = `
+      <label>Frames afetados <span class="val lc-ccount-val">${layer.count}</span>
+        <input type="range" class="lc-ccount" min="1" max="15" value="${layer.count}">
+      </label>
+      <label>Intensidade <span class="val lc-cint-val">${layer.intensity}</span>
+        <input type="range" class="lc-cint" min="0" max="100" value="${layer.intensity}">
+      </label>
+      <div class="hint">XOR esparso nos bytes de P-frames. Intensidade alta pode abortar o decode.</div>
+    `;
+    container.querySelector(".lc-ccount").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-ccount-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-cint").oninput = (e) => { layer.intensity = +e.target.value; container.querySelector(".lc-cint-val").textContent = e.target.value; markBitstreamDirty(); };
+  }
+  else if (layer.type === "pixelsort"){
+    container.innerHTML = `
+      <label>Direção
+        <select class="lc-dir"><option value="h" ${layer.dir==="h"?"selected":""}>Horizontal</option><option value="v" ${layer.dir==="v"?"selected":""}>Vertical</option></select>
+      </label>
+      <label>Critério
+        <select class="lc-crit"><option value="luma" ${layer.criterion==="luma"?"selected":""}>Luminosidade</option><option value="hue" ${layer.criterion==="hue"?"selected":""}>Matiz</option><option value="sat" ${layer.criterion==="sat"?"selected":""}>Saturação</option></select>
+      </label>
+      <label>Threshold mín. <span class="val lc-min-val">${layer.min}</span>
+        <input type="range" class="lc-min" min="0" max="255" value="${layer.min}">
+      </label>
+      <label>Threshold máx. <span class="val lc-max-val">${layer.max}</span>
+        <input type="range" class="lc-max" min="0" max="255" value="${layer.max}">
+      </label>
+    `;
+    container.querySelector(".lc-dir").onchange = (e) => { layer.dir = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-crit").onchange = (e) => { layer.criterion = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-min").oninput = (e) => { layer.min = +e.target.value; container.querySelector(".lc-min-val").textContent = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-max").oninput = (e) => { layer.max = +e.target.value; container.querySelector(".lc-max-val").textContent = e.target.value; scheduleAutoApply(); };
+  }
+  else if (layer.type === "rgbshift"){
+    container.innerHTML = `
+      <label>Ângulo (°) <span class="val lc-ang-val">${layer.angle}</span>
+        <input type="range" class="lc-ang" min="0" max="360" value="${layer.angle}">
+      </label>
+      <label>Intensidade (px) <span class="val lc-amt-val">${layer.amount}</span>
+        <input type="range" class="lc-amt" min="0" max="60" value="${layer.amount}">
+      </label>
+    `;
+    container.querySelector(".lc-ang").oninput = (e) => { layer.angle = +e.target.value; container.querySelector(".lc-ang-val").textContent = e.target.value; scheduleAutoApply(); };
+    container.querySelector(".lc-amt").oninput = (e) => { layer.amount = +e.target.value; container.querySelector(".lc-amt-val").textContent = e.target.value; scheduleAutoApply(); };
+  }
+}
+
+/* ---------- adicionar camadas ---------- */
+document.querySelectorAll(".add-grid button").forEach(btn => {
+  btn.onclick = () => {
+    const type = btn.dataset.add;
+    const layer = makeLayer(type);
+    project.stack.unshift(layer); // unshift = adiciona no ÍNDICE 0 = TOPO do painel (afeta o que está abaixo)
+    renderLayerStack();
+    // se for fonte, abre o diálogo de arquivo automaticamente
+    if (type === "video" || type === "image"){
+      setTimeout(() => {
+        const card = layerStackEl.querySelector(`.layer-card[data-id="${layer.id}"]`);
+        if (card) card.querySelector(".lc-load").click();
+      }, 50);
+    }
+  };
+});
+
+/* ---------- controles globais ---------- */
+$("durSelect").onchange = () => {
+  project.duration = +$("durSelect").value;
+  $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
+  invalidateEncode();
+  renderLayerStack(); // atualiza mini-tls
+  scheduleAutoApply();
+};
+$("fpsRange").oninput = () => {
+  project.fps = +$("fpsRange").value;
+  $("fpsVal").textContent = project.fps;
+  $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
+  invalidateEncode();
+  scheduleAutoApply();
+};
+$("widthInput").onchange = () => {
+  project.width = Math.max(16, Math.round(+$("widthInput").value/2)*2);
+  $("widthInput").value = project.width;
+  invalidateEncode();
+  scheduleAutoApply();
+};
+$("heightInput").onchange = () => {
+  project.height = Math.max(16, Math.round(+$("heightInput").value/2)*2);
+  $("heightInput").value = project.height;
+  invalidateEncode();
+  scheduleAutoApply();
+};
+$("seedInput").oninput = () => { project.seed = +$("seedInput").value || 1; scheduleAutoApply(); };
+$("randSeedBtn").onclick = () => { $("seedInput").value = Math.floor(Math.random()*99999); project.seed = +$("seedInput").value; scheduleAutoApply(); };
+
+function updateActionButtons(){
+  const hasSrc = hasAnySrc();
+  const hasBitstream = hasBitstreamLayer();
+  const canApply = hasSrc;
+  $("applyBtn").disabled = !canApply;
+  // MP4 export: habilitado se temos resultado moshado OU se estamos em modo tempo real
+  $("exportMp4Btn").disabled = !lastMoshResult && !(!hasBitstream && hasSrc);
+  $("exportPngBtn").disabled = !lastStaticCanvas && !lastMoshResult && !(!hasBitstream && hasSrc);
+  $("playPauseBtn").disabled = !hasSrc;
+  $("playPauseBtn").classList.toggle("hidden", false);
+}
+
+function updateFrameCount(){
+  $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
+}
+
+/* ---------- placeholder no stage ---------- */
 function drawPlaceholder(){
   const c = $("stage"); c.width = project.width; c.height = project.height;
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#000"; ctx.fillRect(0,0,c.width,c.height);
   ctx.fillStyle = "#3a3a44"; ctx.font = "13px monospace"; ctx.textAlign = "center";
-  ctx.fillText(mode === "video" ? "envie um vídeo" : "envie uma foto", c.width/2, c.height/2);
+  ctx.fillText("adicione camadas →", c.width/2, c.height/2);
 }
 drawPlaceholder();
+updateFrameCount();
 
-/* ---------- upload ---------- */
-$("dropZone").onclick = () => $("fileInput").click();
-$("dropZone").ondragover = (e) => { e.preventDefault(); };
-$("dropZone").ondrop = (e) => {
-  e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (f) handleFile(f);
-};
-$("fileInput").onchange = (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); };
-
-let fileLoadToken = 0; // descarta cargas antigas se o usuário trocar de arquivo antes da anterior terminar
-async function handleFile(file){
-  const myFileToken = ++fileLoadToken;
-  stopPreviewLoop(); // garante que nenhum preview antigo continue desenhando por cima
-  $("dropZone").classList.add("has-file");
-  lastMoshResult = null; lastPhotoResult = null;
-  $("exportMp4Btn").disabled = true; $("exportPngBtn").disabled = true;
-  if (mode === "video"){
-    videoFile = file;
-    setStatus("Carregando vídeo (demux)…");
-    try {
-      const loaded = await loadVideoFile(file);
-      if (myFileToken !== fileLoadToken) return; // uma carga mais nova já começou
-      videoSrc = loaded;
-      cachedEncode = null; // vídeo novo — invalida qualquer encode em cache do vídeo anterior
-      fitProjectSize(videoSrc.width, videoSrc.height);
-      $("srcInfo").textContent = `${videoSrc.width}×${videoSrc.height} · ${videoSrc.duration.toFixed(1)}s`;
-      regionOffset = 0;
-      project.duration = Math.min(+$("durSelect").value, videoSrc.duration);
-      updateTimelineUI();
-      $("applyBtn").disabled = false;
-      setStatus("Vídeo carregado. Ajuste os parâmetros e clique em Aplicar.");
-      // desenha 1 frame de prévia, já no tamanho/proporção certos
-      const previewCanvas = await videoSrc.getFrameCanvas(0);
-      if (myFileToken !== fileLoadToken) return;
-      $("stage").width = project.width; $("stage").height = project.height;
-      const ctx = $("stage").getContext("2d");
-      if (previewCanvas) ctx.drawImage(previewCanvas, 0, 0, project.width, project.height);
-    } catch(e){
-      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
-    }
+/* ============================================================
+   APLICAR (compõe → encode → bitstream layers → preview)
+   ============================================================ */
+$("applyBtn").onclick = () => applyAll();
+$("playPauseBtn").onclick = () => {
+  if (isPlaying()){
+    // está tocando → pausa
+    stopPlayback();
+    $("playPauseBtn").textContent = "▶";
+    setStatus("Pausado.");
   } else {
-    imageFile = file;
-    setStatus("Carregando imagem…");
-    try {
-      const loaded = await createImageBitmap(file);
-      if (myFileToken !== fileLoadToken) return;
-      imageBitmap = loaded;
-      $("srcInfo").textContent = `${imageBitmap.width}×${imageBitmap.height}`;
-      fitProjectSize(imageBitmap.width, imageBitmap.height);
-      $("stage").width = project.width; $("stage").height = project.height;
-      const ctx = $("stage").getContext("2d");
-      ctx.drawImage(imageBitmap, 0, 0, project.width, project.height);
-      $("applyBtn").disabled = false;
-      setStatus("Imagem carregada. Ajuste os parâmetros e clique em Aplicar.");
-    } catch(e){
-      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
+    // está pausado → toca
+    if (!hasAnySrc()) return;
+    startPlayback();
+    if (isPlaying()){
+      $("playPauseBtn").textContent = "⏸";
+      setStatus("Reproduzindo.");
     }
   }
-}
-
-/* ---------- controles: tempo/saída (duração via dropdown + região arrastável na timeline) ---------- */
-
-function updateTimelineUI(){
-  const srcDur = videoSrc ? videoSrc.duration : 0;
-  const dur = project.duration;
-  const maxOffset = Math.max(0, srcDur - dur);
-  regionOffset = clamp(regionOffset, 0, maxOffset);
-
-  const pLeft = srcDur > 0 ? (regionOffset/srcDur)*100 : 0;
-  const pWidth = srcDur > 0 ? (dur/srcDur)*100 : 100;
-  const region = $("timelineRegion");
-  region.style.left = pLeft + "%";
-  region.style.width = clamp(pWidth, 0, 100) + "%";
-
-  $("regionVal").textContent = `${regionOffset.toFixed(1)}s – ${(regionOffset+dur).toFixed(1)}s`;
-  updateFrameCount();
-}
-
-/* mostra no canvas o frame exato no início do trecho selecionado — sem isso a barra
-   ficaria "cega" (usuário só veria o resultado depois de clicar Aplicar). */
-let regionPreviewSeq = 0;
-async function showRegionPreviewFrame(t){
-  if (!videoSrc || mode !== "video") return;
-  stopPreviewLoop(); // não deixa um preview de mosh já tocando sobrescrever a prévia do scrub
-  const seq = ++regionPreviewSeq;
-  const frameCanvas = await videoSrc.getFrameCanvas(Math.min(Math.max(0,t), videoSrc.duration - 0.001));
-  if (seq !== regionPreviewSeq || !frameCanvas) return; // resposta antiga/sem frame, descarta
-  const c = $("stage");
-  c.width = project.width; c.height = project.height;
-  c.getContext("2d").drawImage(frameCanvas, 0, 0, c.width, c.height);
-}
-
-$("durSelect").onchange = () => {
-  project.duration = +$("durSelect").value;
-  updateTimelineUI();
-  showRegionPreviewFrame(regionOffset);
-  scheduleAutoApply(); // muda a janela -> precisa recodificar; dispara uma vez só
 };
 
-/* arrastar a região destacada inteira (não alças individuais) para reposicionar o trecho.
-   Durante o arraste só atualiza a prévia leve (frame cru, sem mosh) — re-encodar a cada
-   pixel de movimento seria pesado demais. O encode+mosh completo roda ao SOLTAR. */
-(() => {
-  const region = $("timelineRegion"), bar = $("timelineBar");
-  let dragging = false, startX = 0, startOffset = 0;
-  region.addEventListener("pointerdown", (e) => {
-    if (!videoSrc) return;
-    dragging = true; startX = e.clientX; startOffset = regionOffset;
-    region.setPointerCapture(e.pointerId);
-  });
-  region.addEventListener("pointermove", (e) => {
-    if (!dragging || !videoSrc) return;
-    const barWidth = bar.getBoundingClientRect().width || 1;
-    const deltaSec = ((e.clientX - startX) / barWidth) * videoSrc.duration;
-    regionOffset = startOffset + deltaSec;
-    updateTimelineUI();
-    showRegionPreviewFrame(regionOffset);
-  });
-  const endDrag = () => { if (dragging) scheduleAutoApply(); dragging = false; };
-  region.addEventListener("pointerup", endDrag);
-  region.addEventListener("pointercancel", endDrag);
-})();
-
-$("fpsRange").oninput = () => { project.fps = +$("fpsRange").value; $("fpsVal").textContent = project.fps; updateFrameCount(); };
-function updateFrameCount(){
-  $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
-}
-updateTimelineUI();
-
-/* ---------- controles: mosh de vídeo + glitch de foto (ambos reaplicam ao vivo, com debounce) ---------- */
-const bindRange = (id, valId, fmt, onChange) => {
-  const el = $(id), out = $(valId);
-  el.oninput = () => { out.textContent = fmt ? fmt(+el.value) : el.value; if (onChange) onChange(); };
-};
-
-/* glitch de foto: pixel-level, sem encode/decode — já é rápido o bastante pra ser ao vivo de verdade */
-let photoAutoApplyTimer = null;
-function schedulePhotoAutoApply(){
-  if (!imageBitmap || mode !== "photo") return;
-  clearTimeout(photoAutoApplyTimer);
-  photoAutoApplyTimer = setTimeout(() => applyPhotoGlitch(), 80);
+function encodeSignature(total){
+  // Captura TODA a composição (src + pixel-fx) + dimensões + fps + duração + cortes.
+  // Bitstream layers não entram (atuam pós-encode, não invalidam o cache).
+  const state = project.stack
+    .filter(l => l.kind !== "bitstream")
+    .map(l => {
+      const p = { id:l.id, type:l.type, en:l.enabled, bl:l.blend, op:l.opacity, cl:l.clip };
+      if (l.type === "video" && l.src){
+        p.ro = l.regionOffset.toFixed(3);
+        p.st = l.stretch; p.sc = (+l.scale).toFixed(3);
+        p.px = Math.round(l.posX); p.py = Math.round(l.posY);
+      }
+      if (l.type === "image" && l.bitmap){
+        p.st = l.stretch; p.sc = (+l.scale).toFixed(3);
+        p.px = Math.round(l.posX); p.py = Math.round(l.posY);
+      }
+      if (l.type === "pixelsort") Object.assign(p, { d:l.dir, c:l.criterion, mn:l.min, mx:l.max });
+      if (l.type === "rgbshift") Object.assign(p, { a:l.angle, am:l.amount });
+      return JSON.stringify(p);
+    });
+  const cuts = allCutPoints(total).join(",");
+  return [state.join("|"), project.duration, project.fps, project.width, project.height, cuts, total].join("§");
 }
 
-bindRange("bloomTarget","bloomTargetVal", null, scheduleAutoApply);
-bindRange("bloomCount","bloomCountVal", null, scheduleAutoApply);
-bindRange("corruptCount","corruptCountVal", null, scheduleAutoApply);
-bindRange("corruptIntensity","corruptIntensityVal", null, scheduleAutoApply);
-bindRange("sortMin","sortMinVal", null, schedulePhotoAutoApply);
-bindRange("sortMax","sortMaxVal", null, schedulePhotoAutoApply);
-bindRange("rgbAngle","rgbAngleVal", null, schedulePhotoAutoApply);
-bindRange("rgbAmount","rgbAmountVal", null, schedulePhotoAutoApply);
-
-for (const id of ["meltEnabled","bloomEnabled","corruptEnabled"]) $(id).onchange = scheduleAutoApply;
-$("meltCuts").oninput = scheduleAutoApply;
-$("seedInput").oninput = scheduleAutoApply;
-for (const id of ["sortEnabled","rgbEnabled","sortDir","sortCriterion"]) $(id).onchange = schedulePhotoAutoApply;
-
-$("randSeedBtn").onclick = () => { $("seedInput").value = Math.floor(Math.random()*99999); scheduleAutoApply(); };
-
-/* ---------- aplicar ---------- */
-$("applyBtn").onclick = async () => {
-  if (mode === "video") await applyVideoMosh();
-  else applyPhotoGlitch();
-};
-
-$("playPauseBtn").onclick = () => {
-  previewPlaying = !previewPlaying;
-  $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
-};
-
-/* ---------- cache do encode (a etapa LENTA — só refeita se região/resolução/cortes mudarem) ---------- */
-
-function computeCutIdx(total){
-  const cutsRaw = $("meltCuts").value.trim();
-  if (cutsRaw === "auto" || !cutsRaw) return Math.floor(total/2);
-  return clamp(parseInt(cutsRaw.split(",")[0],10) || Math.floor(total/2), 1, total-1);
-}
-function encodeSignature(total, cutIdx){
-  return [regionOffset.toFixed(2), project.duration, project.fps, project.width, project.height, cutIdx, total].join("|");
-}
-
-async function ensureEncoded(){
-  const fps = project.fps;
-  const total = Math.max(1, Math.round(project.duration * fps));
-  const cutIdx = computeCutIdx(total);
-  const sig = encodeSignature(total, cutIdx);
+async function ensureEncoded(total){
+  const sig = encodeSignature(total);
   if (cachedEncode && cachedEncode.sig === sig) return cachedEncode;
-
   setStatus("Codificando frames…"); setProgress(0);
   const W = project.width, H = project.height;
-  const regionStart = regionOffset, regionEnd = regionOffset + project.duration;
-  const keySet = new Set([0, cutIdx]); // sempre codifica o corte como keyframe; melt decide na hora de usar ou não
+  const keySet = new Set([0, ...allCutPoints(total)]);
 
   const drawFrame = async (i, ctx, w, h) => {
-    const t = regionStart + (i / Math.max(1,total-1)) * (regionEnd - regionStart);
-    const frameCanvas = await videoSrc.getFrameCanvas(Math.min(t, videoSrc.duration - 0.001));
-    ctx.clearRect(0,0,w,h);
-    if (frameCanvas) ctx.drawImage(frameCanvas, 0, 0, w, h);
+    await renderFrame(i, ctx, w, h, total);
   };
-  const { chunks, decoderDescription, width, height } = await encodeFrames(total, fps, W, H, drawFrame, keySet, setProgress);
-  cachedEncode = { chunks, decoderDescription, width, height, fps, cutIdx, total, sig };
+  const { chunks, decoderDescription, width, height } = await encodeFrames(total, project.fps, W, H, drawFrame, keySet, setProgress);
+  cachedEncode = { chunks, decoderDescription, width, height, fps: project.fps, total, sig };
   return cachedEncode;
 }
 
-/* ---------- aplicar mosh (RÁPIDO — só manipula/decodifica os chunks já codificados) ---------- */
-async function applyVideoMosh(){
-  if (!videoSrc) return;
-  $("applyBtn").disabled = true; $("exportMp4Btn").disabled = true;
-  setProgress(0);
+// Flag anti-reentry: se um applyAll já está rodando, ignora chamadas concurrentes
+let applyAllRunning = false;
 
-  const seed = +$("seedInput").value || 1;
+/** APLICAR: processa (encode + mosh + decode) → armazena frames → desenha 1º frame.
+ *  NÃO inicia a reprodução. O usuário clica Play/Pause para tocar. */
+async function applyAll(){
+  if (!hasAnySrc()) { setStatus("Adicione uma fonte (vídeo ou imagem) primeiro."); return; }
+  if (applyAllRunning) return;
+  applyAllRunning = true;
+  clearTimeout(autoApplyTimer);
+  $("applyBtn").disabled = true;
+  stopPlayback(); // para qualquer reprodução ativa
+  $("playPauseBtn").textContent = "▶"; // volta para estado "play" (pausado)
+  setProgress(null);
+
+  const seed = project.seed || 1;
   const rng = mulberry32(hashInt(seed));
+  const total = Math.max(1, Math.round(project.duration * project.fps));
+  const hasBS = hasBitstreamLayer();
 
+  // libera frames decodificados antigos
+  currentDecodedFrames.forEach(f => { try { if (f) f.close(); } catch(e){} });
+  currentDecodedFrames = [];
+
+  // MODO 1: sem bitstream → composição em tempo real (zero encode)
+  if (!hasBS){
+    lastMoshResult = null;
+    lastStaticCanvas = null;
+    cachedEncode = null;
+    // desenha 1 frame como preview snapshot (não toca)
+    try {
+      const c = $("stage");
+      c.width = project.width; c.height = project.height;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.clearRect(0, 0, project.width, project.height);
+      await renderFrame(0, ctx, project.width, project.height, total);
+    } catch(e){}
+    $("exportPngBtn").disabled = false;
+    $("exportMp4Btn").disabled = false;
+    $("playPauseBtn").disabled = false;
+    setStatus("Composição pronta. Clique Play para reproduzir.");
+    $("applyBtn").disabled = false;
+    updateActionButtons();
+    applyAllRunning = false;
+    return;
+  }
+
+  // MODO 2: com bitstream → encode (cacheado) + manipular + decode
+  setProgress(0);
   try {
-    const enc = await ensureEncoded();
-    const { chunks, decoderDescription, width, height, fps, cutIdx, total } = enc;
+    const enc = await ensureEncoded(total);
+    const { chunks, decoderDescription, width, height, fps } = enc;
+    const { chunks: moshed, notes } = applyBitstreamLayers(chunks, fps, rng);
+    lastMoshResult = { chunks: moshed, decoderDescription, width, height, fps };
+    lastStaticCanvas = null;
 
-    let working = chunks;
-    let decoderNote = "";
-    if ($("meltEnabled").checked){
-      const r = applyMelt(working, [cutIdx]);
-      working = r.chunks;
+    setStatus("Decodificando " + moshed.length + " frames…"); setProgress(0.55);
+
+    // decodifica TODOS os frames e armazena
+    const frames = await decodeAllFrames(moshed, decoderDescription, width, height);
+    if (frames.length === 0 || !frames[0]){
+      setStatus("Decode não produziu frames. Tente reduzir a intensidade.");
+      setProgress(null);
+      $("applyBtn").disabled = false;
+      applyAllRunning = false;
+      return;
     }
-    if ($("bloomEnabled").checked){
-      const r = applyBloom(working, +$("bloomTarget").value, +$("bloomCount").value, fps);
-      working = r.chunks;
-      decoderNote = "Bloom ativo: usando hardwareAcceleration:'prefer-hardware' no preview.";
-    }
-    if ($("corruptEnabled").checked){
-      const intensity01 = (+$("corruptIntensity").value) / 100;
-      const r = applyCorrupt(working, +$("corruptCount").value, intensity01, rng);
-      working = r.chunks;
-      decoderNote = "Corrupção ativa: usando hardwareAcceleration:'prefer-hardware' no preview.";
-    }
-    $("decoderWarn").textContent = decoderNote;
+    currentDecodedFrames = frames;
 
-    setStatus("Decodificando preview…"); setProgress(0.55);
-
-    lastMoshResult = { chunks: working, decoderDescription, width, height, fps };
-
-    await playPreview(working, decoderDescription, width, height, fps);
+    // desenha 1º frame no canvas (preview estático)
+    const c = $("stage");
+    c.width = width; c.height = height;
+    const ctx = c.getContext("2d");
+    try { ctx.drawImage(frames[0], 0, 0, width, height); } catch(e){}
 
     $("exportMp4Btn").disabled = false;
     $("playPauseBtn").disabled = false;
-    $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
-    setStatus(`Pronto — ${total} frames, ${working.length} chunks no stream.`);
+    setStatus(`Processado — ${frames.length} frames prontos. Clique Play para reproduzir.`);
     setProgress(null);
+    refreshEncDots();
   } catch(e){
     setStatus("Erro: " + e.message);
     setProgress(null);
   }
   $("applyBtn").disabled = false;
+  updateActionButtons();
+  applyAllRunning = false;
 }
 
-/* reaplica automaticamente (com debounce) quando um parâmetro de mosh muda — só a parte
-   RÁPIDA roda de novo (o encode fica em cache); dá a sensação de "tempo real" possível
-   dentro da técnica real de datamosh (que exige decode, não é um filtro instantâneo). */
-let autoApplyTimer = null;
-function scheduleAutoApply(){
-  if (!videoSrc || mode !== "video") return;
-  clearTimeout(autoApplyTimer);
-  autoApplyTimer = setTimeout(() => applyVideoMosh(), 250);
-}
-
-async function playPreview(chunks, decoderDescription, w, h, fps){
-  const myToken = ++previewLoopToken;
-  const canvas = $("stage"); canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext("2d");
+/** Decodifica TODOS os chunks e retorna array de ImageBitmaps.
+ *  Não toca — só produz os frames. */
+async function decodeAllFrames(chunks, decoderDescription, w, h){
   const frames = [];
-  let decodeErrorMsg = null;
-
-  // Importante: fechar cada VideoFrame IMEDIATAMENTE após convertê-lo num bitmap leve.
-  // Decoders de hardware têm um pool pequeno de buffers — acumular VideoFrames abertos
-  // (para tocar depois, em loop) esgota esse pool e trava o decode sem erro nenhum.
-  const pendingConversions = [];
+  let error = null;
   await new Promise((resolve) => {
+    let done = false;
     decodeChunks(chunks, decoderDescription, w, h,
       (vf) => {
-        const idx = frames.length; frames.push(null); // reserva a posição na ordem certa
-        const p = createImageBitmap(vf).then(bitmap => { frames[idx] = bitmap; });
-        pendingConversions.push(p);
-        try { vf.close(); } catch(e){} // seguro: createImageBitmap já capturou os dados do frame
+        const idx = frames.length; frames.push(null);
+        createImageBitmap(vf).then(bmp => { frames[idx] = bmp; }).catch((e)=>{ console.warn("bitmap fail", e); });
+        try { vf.close(); } catch(e){}
       },
-      (count, errored) => resolve(),
-      (msg, count) => { decodeErrorMsg = `${msg} (parou no frame ${count})`; }
+      (count, errored) => { done = true; resolve(); },
+      (msg, count) => { error = msg + " (frame " + count + ")"; }
     );
+    setTimeout(() => { if (!done) resolve(); }, 30000);
   });
-  await Promise.all(pendingConversions);
+  // espera todas as conversões para ImageBitmap
+  const startWait = Date.now();
+  await new Promise(r => {
+    const check = () => {
+      if (frames.length === 0) return r();
+      if (frames.every(f => f !== null)) return r();
+      if (Date.now() - startWait > 5000) return r();
+      setTimeout(check, 16);
+    };
+    check();
+  });
+  return frames;
+}
 
-  if (decodeErrorMsg){
-    setStatus("Aviso: decodificação parou antes do fim — " + decodeErrorMsg + ". Reduza a intensidade.");
+/** Inicia a reprodução. Decide Mode 1 (realtime) ou Mode 2 (decoded frames) automaticamente. */
+function startPlayback(){
+  if (isPlaying()) return; // já está tocando
+  const total = Math.max(1, Math.round(project.duration * project.fps));
+  if (currentDecodedFrames.length > 0){
+    // Mode 2: toca frames decodificados
+    startDecodedPlayback(currentDecodedFrames, lastMoshResult.width, lastMoshResult.height, lastMoshResult.fps);
+  } else if (hasAnySrc()){
+    // Mode 1: composição em tempo real
+    startRealtimePlayback(project.width, project.height, project.fps, total);
   }
-  if (frames.length === 0) return;
+}
 
+/** Reproduz frames já decodificados (Mode 2). */
+function startDecodedPlayback(frames, w, h, fps){
+  const player = { cancelled: false };
+  currentPlaybackPlayer = player;
+  const canvas = $("stage");
+  const ctx = canvas.getContext("2d");
   let i = 0;
   function loop(){
-    if (myToken !== previewLoopToken){ frames.forEach(f=>{ try{f.close();}catch(e){} }); return; }
-    if (previewPlaying){
-      ctx.drawImage(frames[i], 0, 0, w, h);
+    if (player.cancelled) return;
+    if (frames[i]){
+      try { ctx.drawImage(frames[i], 0, 0, w, h); } catch(e){}
       i = (i + 1) % frames.length;
     }
     setTimeout(() => requestAnimationFrame(loop), 1000/fps);
@@ -865,62 +1422,135 @@ async function playPreview(chunks, decoderDescription, w, h, fps){
   loop();
 }
 
-function applyPhotoGlitch(){
-  if (!imageBitmap) return;
-  const w = project.width, h = project.height;
-  const canvas = $("stage"); canvas.width = w; canvas.height = h;
+/** Composição em tempo real (Mode 1): percorre a pilha frame a frame, sem encode.
+   Fluxo bottom-up: base do painel (fontes) desenha primeiro, efeitos acima
+   transformam o resultado. Cada camada afeta o que está ABAIXO dela no painel.
+   Usa DOUBLE-BUFFERING: renderiza num OffscreenCanvas e só copia para o canvas
+   visível quando o frame está completo — evita flicker. */
+function startRealtimePlayback(w, h, fps, total){
+  const player = { cancelled: false };
+  currentPlaybackPlayer = player;
+  const canvas = $("stage");
+  if (canvas.width !== w || canvas.height !== h){ canvas.width = w; canvas.height = h; }
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(imageBitmap, 0, 0, w, h);
-  const imgData = ctx.getImageData(0,0,w,h);
-
-  if ($("sortEnabled").checked){
-    pixelSort(imgData, w, h, {
-      dir: $("sortDir").value,
-      criterion: $("sortCriterion").value,
-      min: +$("sortMin").value,
-      max: +$("sortMax").value
-    });
+  const back = new OffscreenCanvas(w, h);
+  const bctx = back.getContext("2d", { willReadFrequently: true });
+  let i = 0;
+  const frameDuration = 1000 / fps;
+  let nextFrameTime = performance.now();
+  let rendering = false;
+  async function loop(){
+    if (player.cancelled) return;
+    const now = performance.now();
+    if (now >= nextFrameTime && !rendering){
+      rendering = true;
+      nextFrameTime = now + frameDuration;
+      try {
+        await renderFrame(i, bctx, w, h, total);
+        if (player.cancelled) return;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(back, 0, 0);
+        i = (i + 1) % total;
+      } catch(e){}
+      rendering = false;
+    }
+    requestAnimationFrame(loop);
   }
-  if ($("rgbEnabled").checked){
-    rgbShift(imgData, w, h, +$("rgbAngle").value, +$("rgbAmount").value);
-  }
-  ctx.putImageData(imgData, 0, 0);
-  lastPhotoResult = canvas;
-  $("exportPngBtn").disabled = false;
-  setStatus("Glitch aplicado.");
+  loop();
 }
 
-/* ---------- export ---------- */
+let autoApplyTimer = null;
+function scheduleAutoApply(){
+  // se não tem fonte pra renderizar, PARA o playback e limpa o canvas
+  if (!hasAnySrc()){
+    stopPlayback();
+    lastMoshResult = null;
+    lastStaticCanvas = null;
+    invalidateEncode();
+    drawPlaceholder();
+    $("exportMp4Btn").disabled = true;
+    $("exportPngBtn").disabled = true;
+    $("playPauseBtn").disabled = true;
+    setStatus("Pronto. Adicione uma fonte para começar.");
+    return;
+  }
+  // NÃO dispara applyAll automaticamente — o usuário deve clicar Aplicar.
+  // Só atualiza o indicador vermelho/verde das camadas bitstream.
+  refreshEncDots();
+}
+
+/** Marcador para mudanças em params bitstream (melt cortes, bloom target/count,
+ *  corrupt count/intensity). NÃO dispara auto-apply — o usuário deve clicar Aplicar
+ *  manualmente. Motivo: bitstream params não invalidam o encode (reaproveitam o cache),
+ *  mas disparar applyAll automático causava race condition entre players concorrentes. */
+function markBitstreamDirty(){
+  // nada a fazer aqui — só existe para documentar a intenção no código.
+  // O usuário clica Aplicar quando quiser ver o resultado.
+}
+
+/** Atualiza só os pontos vermelho/verde das camadas bitstream, sem re-renderizar o painel.
+ *  Seguro de chamar a qualquer momento — não destrói inputs. */
+function refreshEncDots(){
+  const fresh = isBitstreamEncodeFresh();
+  document.querySelectorAll(".layer-card .lc-enc-dot").forEach(dot => {
+    dot.classList.toggle("fresh", fresh);
+    dot.classList.toggle("stale", !fresh);
+    dot.title = fresh ? "Encode atualizado" : "Encode pendente — será codificado ao aplicar";
+  });
+}
+
+/* (antigo playPreview removido — substituído por decodeAllFrames + startDecodedPlayback.
+   Apply agora só processa; Play/Pause controla a reprodução separadamente.) */
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
 $("exportPngBtn").onclick = () => {
-  if (!lastPhotoResult) return;
-  lastPhotoResult.toBlob((blob) => downloadBlob(blob, `datamosh-foto-${Date.now()}.png`), "image/png");
+  const src = lastStaticCanvas || $("stage");
+  src.toBlob((blob) => downloadBlob(blob, `datamosh-${Date.now()}.png`), "image/png");
+  setStatus("PNG exportado ✓");
 };
 
+/* Export MP4 — funciona nos dois modos:
+   - Modo 2 (bitstream): usa os chunks já moshados de lastMoshResult
+   - Modo 1 (tempo real): codifica agora na hora do export */
 $("exportMp4Btn").onclick = async () => {
-  if (!lastMoshResult) return;
   $("exportMp4Btn").disabled = true;
   setStatus("Exportando MP4…"); setProgress(0);
   try {
+    let chunks, decoderDescription, width, height, fps = project.fps;
+
+    if (lastMoshResult){
+      // Modo 2: chunks já moshados
+      ({ chunks, decoderDescription, width, height, fps } = lastMoshResult);
+    } else {
+      // Modo 1: codifica agora (composição em tempo real, sem bitstream)
+      const total = Math.max(1, Math.round(project.duration * project.fps));
+      const keySet = new Set([0, ...allCutPoints(total)]);
+      const drawFrame = async (i, ctx, w, h) => { await renderFrame(i, ctx, w, h, total); };
+      setStatus("Codificando para export…");
+      const enc = await encodeFrames(total, fps, project.width, project.height, drawFrame, keySet, setProgress);
+      chunks = enc.chunks; decoderDescription = enc.decoderDescription;
+      width = enc.width; height = enc.height;
+    }
+
     const mb = await loadMediabunny();
     const { Output, Mp4OutputFormat, BufferTarget, EncodedVideoPacketSource, EncodedPacket } = mb;
     const target = new BufferTarget();
     const output = new Output({ format: new Mp4OutputFormat(), target });
     const source = new EncodedVideoPacketSource("avc");
-    output.addVideoTrack(source, { frameRate: lastMoshResult.fps });
+    output.addVideoTrack(source, { frameRate: fps });
     await output.start();
-
-    const { chunks, fps, width, height, decoderDescription } = lastMoshResult;
     for (let i = 0; i < chunks.length; i++){
       const c = chunks[i];
       const packet = new EncodedPacket(c.data, c.type, c.timestamp / 1e6, (c.duration || (1e6/fps)) / 1e6);
-      // o 1º pacote precisa do decoderConfig (avcC) — sem isso o Mediabunny rejeita o mux
       const meta = i === 0 ? { decoderConfig: { codec: CODEC, codedWidth: width, codedHeight: height, description: decoderDescription } } : undefined;
       await source.add(packet, meta);
       if (i % 10 === 0) setProgress(i / chunks.length);
     }
     await output.finalize();
     const blob = new Blob([target.buffer], { type: "video/mp4" });
-    downloadBlob(blob, `datamosh-${lastMoshResult.width}x${lastMoshResult.height}-${Date.now()}.mp4`);
+    downloadBlob(blob, `datamosh-${width}x${height}-${Date.now()}.mp4`);
     setStatus("MP4 exportado ✓");
   } catch(e){
     setStatus("Falha no export: " + e.message);
@@ -929,7 +1559,12 @@ $("exportMp4Btn").onclick = async () => {
   $("exportMp4Btn").disabled = false;
 };
 
-setMode("video");
+/* ============================================================
+   INIT
+   ============================================================ */
+renderLayerStack();
+// painel inicia vazio — usuário adiciona camadas conforme precisa
+
 </script>
 </body>
 </html>

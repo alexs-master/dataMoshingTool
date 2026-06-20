@@ -145,6 +145,104 @@
 - Artefatos de debug (vídeo de teste, scripts de inspeção de MP4, servidor HTTP ad-hoc) foram
   removidos antes do commit; `.gitignore` atualizado para preveni-los no futuro.
 
+### Fase 12 — Análise técnica do projeto (2026-06-19/20, sessão de revisão)
+- O usuário pediu "analise isto" sobre o arquivo `dataMoshingTool.rar` enviado (todo o projeto
+  até então: `index.html` + 8 markdowns + 2 PDFs).
+- **Análise completa** do `index.html` (936 linhas) e dos docs. Identifiquei a arquitetura em
+  duas etapas (composição → bitstream), os acertos de engenharia (build limpo, encoder baseline,
+  Mediabunny demux, cache do encode, race conditions tratadas com tokens), as três técnicas
+  validadas empiricamente (melt, bloom, corrupt com `prefer-hardware`), e **6 bugs não
+  documentados** quemereciam correção antes da entrega:
+  1. `applyMelt` ignorava cortes múltiplos (só usava o primeiro)
+  2. `corruptIntensity=0` ainda aplicava XOR
+  3. Sem feature-detect de `hardwareAcceleration:'prefer-hardware'`
+  4. `applyBloom` compartilhava referência ao chunk duplicado (bug latente)
+  5. Export podia baixar mosh antigo se o debounce não tivesse disparado
+  6. Bitrate estático, não adaptativo
+- **Status vs. plano:** Blocos 0/1/2/5 ✅, Blocos 3 (UI camadas/blend), 4 (export real) e 6
+  (polish/deploy) pendentes — exatamente o sistema de camadas era a peça grande que faltava.
+
+### Fase 13 — Bloco 3 ✅: Sistema de camadas completo (rewrite do `index.html`, 2026-06-19/20)
+- 🔁 **Crítica central do usuário:** "uma das características do looplab que era para ser mantida
+  era o sistema de camadas. Por que não implementou? Tanto vídeo quanto foto devem ser geradores
+  que aparecem no painel de camadas e possam ser empilhados e reordenados, além de terem blend
+  modes e clipping mask. Os efeitos datamosh também devem ser da mesma forma."
+- **Diagnóstico:** o `index.html` da Fase 11 usava tabs Vídeo/Foto com params globais — não havia
+  pilha de camadas. Isso quebrava o princípio de "ferramenta feita para datamoshing" estabelecido
+  no `MVP-MAP.md` (que listava explicitamente o sistema de camadas como `♻️ PORTAR`).
+- **Tensão arquitetural identificada:** pixel-fx operam por frame (Etapa 1, durante a composição);
+  bitstream-fx operam pós-encode (Etapa 2, sobre os chunks H.264). Semânticas fundamentalmente
+  diferentes — não dá para simplesmente jogar tudo na mesma pilha e renderizar top-down.
+- **Solução adotada:** **UI unificada, execução em duas fases.** Todas as camadas aparecem na
+  mesma pilha (com badge colorido por kind: verde=src, ciano=pixelfx, amarelo=bitstream) e o
+  usuário reordena tudo junto. Mas `renderFrame` percorre a pilha bottom-up e **pula**
+  bitstream layers (que não têm efeito durante a composição); `applyBitstreamLayers` age só
+  depois do encode, também bottom-up, sobre os chunks. Encoder põe keyframes na UNIÃO dos
+  cortes de todas as melt layers, garantindo que cada uma tenha o que remover.
+- **7 tipos de camada:** video (Mediabunny demux), image (ImageBitmap), pixelsort (ASDF, código
+  novo), rgbshift (código novo), melt, bloom, corrupt. Cada uma com params específicos.
+- **Cada card na UI tem:** drag handle (⋮⋮), eye toggle, badge do kind, nome editável, delete,
+  blend dropdown (13 modos), opacity slider, checkbox de máscara de recorte, e params específicos.
+- **Clip mask estilo Photoshop:** usa `destination-in` no canvas da camada para recortar pelo
+  alfa do composto abaixo — funciona com blend e opacity.
+- **Bugs corrigidos nesta rewrite** (3 dos 6 identificados na Fase 12):
+  - Multi-corte melt: `parseCutFrames` retorna array, `allCutPoints` coleta união de todas melts
+  - `corruptIntensity=0`: early-return, não aplica XOR
+  - `applyBloom` clona `data` do chunk duplicado (`data.slice()`)
+- Docs atualizados: `00-MASTER.md` (status, arquitetura com seção de camadas, definição de
+  entregue), `MVP-MAP.md` (escopo com ✅, modelo de dados reescrito, tabela de porte atualizada),
+  `PLAN.md` (status dos blocos), `DEVLOG.md` (entrada detalhada).
+
+### Fase 14 — Convenção da pilha + dois modos de reprodução (2026-06-20)
+- 🔁 **Crítica do usuário:** "no painel de camadas, as camadas devem afetar o que está abaixo
+  delas, não acima" e "por que toda mudança exige re-codificar antes da reprodução? esses
+  efeitos datamoshing não podem funcionar em tempo real?"
+- **Bug de convenção:** o template inicial fazia `project.stack.push(v, m)` (vídeo no topo do
+  painel, melt na base) — mas a regra "camada de cima afeta a de baixo" exige Melt ACIMA do
+  Vídeo. E a iteração era top-down (índice 0 primeiro), o que significava o oposto do pedido.
+- **Correção para pipeline bottom-up:** `renderFrame` e `applyBitstreamLayers` agora iteram
+  `for (li = stack.length - 1; li >= 0; li--)`. Cada camada afeta o resultado acumulado do que
+  está ABAIXO dela no painel (convenção Photoshop-like).
+- **Resposta técnica à pergunta sobre tempo real:** depende do tipo de efeito. Composição
+  (src + pixel-fx) é instantânea — pode ser 100% tempo real. Bitstream (melt/bloom/corrupt)
+  **exige** encode H.264 primeiro (você não pode corromper bytes de um stream que ainda não
+  existe) — intrínseco à técnica, não limitação da implementação.
+- **Implementado: dois modos de reprodução:**
+  - **Modo 1 (sem bitstream) — TEMPO REAL:** zero encode, render direto no canvas, debounce de
+    60ms. Sliders reagem instantaneamente.
+  - **Modo 2 (com bitstream) — DECODE PROGRESSIVO:** encode cacheado por assinatura (inclui
+    src+pixelfx+regiões+dimensões+fps+cortes); mudar só bitstream params = ~5ms manipulação +
+    re-decode. Decode começa a tocar assim que o 1º frame está pronto (~100ms), o resto
+    decodifica em background.
+- **Cache signature expandida:** agora inclui TODA a composição (src + pixel-fx), não só
+  regiões de vídeo. Mudar threshold do pixel-sort invalida o cache corretamente.
+- **Export MP4 unificado:** funciona nos dois modos — se houver `lastMoshResult` (Modo 2), usa
+  chunks já moshados; senão (Modo 1), codifica na hora do export.
+
+### Fase 15 — Fixes de UX e bugs de interface (2026-06-20, teste real do sistema de camadas)
+- Teste real pelo usuário expôs uma série de bugs de UX que não apareciam só lendo o código:
+- 🐛 **Bug: arrastar slider arrastava o card.** Causa: `card.draggable=true` no card todo.
+  Corrigido: só o handle `.lc-handle` é draggable; `dragstart` listener faz `preventDefault()`
+  em qualquer target que não seja o handle.
+- 🐛 **Bug: preview piscava preto.** Causa dupla: (1) `renderFrame` faz `clearRect` e depois
+  `await getFrameCanvas` — durante o await o canvas visível ficava limpo; (2) re-setar
+  `canvas.width/height` (mesmo ao mesmo valor) limpa o canvas. Corrigido: **double-buffering**
+  (OffscreenCanvas como back buffer, só copia quando o frame está completo) + só redimensiona
+  se as dimensões realmente mudaram.
+- 🐛 **Bug: deletar camada deixava o último frame estático.** Causa: `scheduleAutoApply` tinha
+  early-return sem parar o preview loop. Corrigido: quando não há fonte, chama `stopPreviewLoop`,
+  limpa caches, desenha placeholder, desabilita botões.
+- 🐛 **Bug: checkbox "Máscara de recorte" centralizado.** Causa: conflito de CSS entre
+  `.lc-controls label` (flex-direction:column, especificidade maior) e `.lc-clip`
+  (align-items:center). Corrigido: novo seletor `.lc-controls .lc-clip` (especificidade maior)
+  força `flex-direction:row; justify-content:flex-start`.
+- ✏️ **Mudanças de UX pedidas pelo usuário:** "Ajustar à próxima fonte" virou checkbox
+  persistente (era botão one-shot); painel de camadas inicia vazio (era template Vídeo+Melt);
+  label do clip simplificado para "Máscara de recorte".
+- **Lição geral:** o teste real pelo usuário revelou bugs que eu não teria encontrado só lendo
+  o código — flicker, drag em sliders, frame estático após delete, checkbox centralizado. Isso
+  reforça a importância de testar com o usuário, não só com automação.
+
 ---
 
 ## Decisões-chave (resumo)
@@ -164,6 +262,10 @@
 | D11 | Corrupção de bytes com piso de densidade segura (stride ~15–20) na UI | Densidade maior derruba o decode mesmo em hardware (achado empírico) | 10 |
 | D12 | Ingestão de vídeo via **demux Mediabunny** (`Input`+`CanvasSink`), não `<video>`+seek | `<video>` falhava em carregar mesmo MP4 válido nos testes; WebCodecs/Mediabunny decodificou o mesmo arquivo sem problema (achado empírico) | 11 |
 | D13 | Frames de preview convertidos em `ImageBitmap` e o `VideoFrame` fechado na hora | Manter `VideoFrame`s abertos p/ tocar em loop esgota o pool de buffers do decoder de hardware e trava o decode sem erro (achado empírico) | 11 |
+| D14 | **UI unificada, execução em duas fases** para o sistema de camadas | Pixel-fx (por frame) e bitstream-fx (pós-encode) têm semânticas diferentes; UI unificada preserva a usabilidade, execução em fases preserva a corretude técnica | 13 |
+| D15 | **Pipeline bottom-up** (base do painel → topo) — cada camada afeta o que está ABAIXO dela no painel | Convenção Photoshop-like pedida pelo usuário; template inicial estava invertido | 14 |
+| D16 | **Dois modos de reprodução** — tempo real (sem bitstream) + decode progressivo (com bitstream) | Composição é instantânea; bitstream exige encode. Modo tempo real elimina espera desnecessária; modo bitstream usa decode progressivo para sensação de tempo real | 14 |
+| D17 | **Double-buffering** no preview (OffscreenCanvas back buffer) | `renderFrame` é async (await getFrameCanvas); desenhar direto no canvas visível causava flicker (canvas limpo durante await) | 15 |
 
 ---
 

@@ -8,17 +8,21 @@
 
 ## ⏱️ STATUS ATUAL  ·  PRÓXIMA AÇÃO
 
-- **Fase:** BUILD em andamento. Bloco 1 (núcleo) ✅ e Bloco 0+2 (`index.html` real, upload+mosh+
-  preview+export) ✅ concluídos — testados de ponta a ponta no navegador, 3 bugs reais corrigidos
-  (ver `DEVLOG.md`/`PROCESSO.md` Fase 11: ingestão de vídeo via Mediabunny em vez de `<video>`,
-  metadata no 1º pacote do export, frames de preview como ImageBitmap).
+- **Fase:** BUILD em andamento. Bloco 1 (núcleo) ✅, Bloco 0+2 (`index.html` real, upload+mosh+
+  preview+export) ✅, **Bloco 3 (sistema de camadas completo) ✅ concluído em sessão de revisão**
+  (2026-06-19/20) — UI unificada com 7 tipos de camada, blend modes, opacity, clip mask,
+  drag-reorder, e dois modos de reprodução (tempo real p/ composição sem bitstream; decode
+  progressivo p/ composição com bitstream). Bugs prévios do `index.html` antigo corrigidos
+  (multi-corte melt, intensity=0, drag-handle, flicker, deleção de camada, etc.).
 - **Prazo de entrega:** SÁBADO 2026-06-20.
-- **Janela de build:** SEXTA 2026-06-19.
-- **➡️ PRÓXIMA AÇÃO ao retomar:** re-testar o fluxo completo após os 3 fixes (ainda não re-validado
-  de ponta a ponta) → Bloco 3 (UI de camadas/blend) → Bloco 4 (validar export real, baixar e abrir o MP4).
+- **Janela de build:** SEXTA 2026-06-19 (estendida para a madrugada de sábado).
+- **➡️ PRÓXIMA AÇÃO ao retomar:** validar o **export MP4** real fora do ambiente de teste
+  (download e abertura em player externo), testar em outro navegador (Safari/Firefox), fazer
+  feature-detect de `hardwareAcceleration:'prefer-hardware'` para UX melhor quando GPU falta,
+  e considerar Bloco 6 (presets JSON+seed, deploy Vercel).
 - **Log de progresso:** ver `DEVLOG.md` (atualizar a cada etapa).
-- **Repositório:** https://github.com/alexs-master/dataMoshingTool — `index.html` ainda não commitado
-  na branch principal nesta sessão; ver PR aberto se houver.
+- **Repositório:** https://github.com/alexs-master/dataMoshingTool — commits pendentes para
+  o `index.html` atualizado com sistema de camadas (commitar na próxima sessão).
 
 ---
 
@@ -74,8 +78,36 @@ empurra cada canvas composto no `VideoEncoder` que controlamos.
 **Stack:** single-file HTML + WebCodecs + Mediabunny (ESM via CDN), 100% client-side, deploy
 estático no Vercel. SEM servidor. **NÃO é fork do Loop Lab** (ver abaixo).
 
+### Sistema de camadas (Etapa 1 — composição por frame)
+Cada camada tem `id`, `type`, `kind` (src/pixelfx/bitstream), `enabled`, `blend`, `opacity`,
+`clip`, `name`, e params específicos. A pilha (`project.stack`) é percorrida **bottom-up** na
+renderização: o último índice (base do painel) é processado primeiro; o índice 0 (topo do painel)
+é o último efeito aplicado. **Cada camada afeta o que está ABAIXO dela no painel** — convenção
+Photoshop-like, fonte na base, efeitos em cima.
+
+- **src** (vídeo/imagem): desenham no canvas com blend/opacity/clip
+- **pixelfx** (pixel-sort/rgbshift): filtram o composto ATUAL (resultado de tudo que está abaixo
+  no painel); opacity vira "força" do efeito
+- **bitstream** (melt/bloom/corrupt): PULADAS aqui, atuam pós-encode (Etapa 2)
+
+### Aplicação dos bitstream-fx (Etapa 2 — pós-encode, bottom-up)
+Após o encode, as camadas bitstream são aplicadas em ordem bottom-up sobre os chunks:
+melt → bloom → corrupt (ou a ordem que estiverem na pilha). Encoder põe keyframes na UNIÃO dos
+cortes de todas as melt layers, garantindo que cada uma tenha o que remover.
+
+### Dois modos de reprodução
+- **Sem bitstream (tempo real):** zero encode, render direto no canvas com double-buffering (evita
+  flicker). Debounce de 60ms — sliders reagem instantaneamente.
+- **Com bitstream:** encode (cacheado por assinatura que inclui src+pixelfx+regiões+dimensões+fps+
+  cortes), manipulação de chunks (~5ms), decode progressivo (começa a tocar após o 1º frame, o
+  resto decodifica em background).
+
 ### Parâmetros-chave do encoder (evita B-frames → mosh limpo)
 `codec:"avc1.42001f"` (baseline) · `latencyMode:"realtime"` · `keyFrame:true` só no frame 0 (+ cortes).
+
+### Decoder — config crítica validada empiricamente
+`hardwareAcceleration:"prefer-hardware"` é **obrigatório** para bloom e corrupt sobreviverem —
+decoder de software aborta por validação estrita de `frame_num` no slice header do H.264.
 
 ---
 
@@ -147,11 +179,20 @@ Detalhes completos do experimento: `DEVLOG.md` (entrada 2026-06-19) e `PLAN.md` 
 
 ## ✅ DEFINIÇÃO DE "ENTREGUE" (sábado)
 
-- [ ] Vídeo enviado → datamosh real (melt + bloom) → preview ao vivo → download MP4.
-- [ ] Imagem enviada → pixel-sort/corrupção real → export.
-- [ ] Controles: tipo de efeito, intensidade/Nx, pontos de corte, seed reprodutível.
-- [ ] Deploy Vercel (estático, single-file).
-- Bônus: empilhar 2 fontes c/ blend, reorder/drop, GIF/PNG-seq, presets compartilháveis.
+- [x] Vídeo enviado → datamosh real (melt + bloom + corrupt) → preview ao vivo → download MP4.
+- [x] Imagem enviada → pixel-sort/corrupção real → export PNG (e MP4 se quiser via composição).
+- [x] **Sistema de camadas completo:** fontes (vídeo/imagem) + efeitos pixel-level (pixel-sort/RGB
+      shift) + efeitos bitstream (melt/bloom/corrupt) na MESMA pilha, com blend modes (13), opacity,
+      máscara de recorte (clip), on/off e drag-reorder. Cada camada afeta o que está ABAIXO dela
+      no painel (pipeline bottom-up).
+- [x] Controles: tipo de efeito, intensidade/Nx, pontos de corte, **seed** reprodutível.
+- [x] **Dois modos de reprodução:** tempo real (sem bitstream — zero encode, ~60ms debounce) e
+      bitstream (encode cacheado + decode progressivo — começa a tocar assim que o 1º frame está
+      pronto, decodifica o resto em background).
+- [ ] Deploy Vercel (estático, single-file). ← pendente.
+- [ ] Validar export MP4 real (baixar + abrir em player externo). ← pendente.
+- Bônus: empilhar 2 fontes c/ blend ✓, reorder/drop ✓ (via sistema de camadas), GIF/PNG-seq
+  (pendente), presets compartilháveis (pendente).
 
 ---
 
