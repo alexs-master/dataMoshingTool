@@ -234,7 +234,7 @@ function makeLayer(type){
     case "video":      return { ...base, kind:"src",      name:"Vídeo",      file:null, src:null, regionOffset:0, ...xform };
     case "image":      return { ...base, kind:"src",      name:"Imagem",     file:null, bitmap:null, ...xform };
     case "melt":       return { ...base, kind:"bitstream",name:"Melt",       cutFrames:"auto" };
-    case "bloom":      return { ...base, kind:"bitstream",name:"Bloom",      targetFrame:10, count:20 };
+    case "bloom":      return { ...base, kind:"bitstream",name:"Bloom",      targetFrame:10, count:20, window:4 };
     case "corrupt":    return { ...base, kind:"bitstream",name:"Corrupt",    count:3, intensity:40 };
     case "pixelsort":  return { ...base, kind:"pixelfx",  name:"Pixel sort", dir:"h", criterion:"luma", min:60, max:200 };
     case "rgbshift":   return { ...base, kind:"pixelfx",  name:"RGB shift",  angle:0, amount:8 };
@@ -311,7 +311,7 @@ function applyMelt(chunks, cutFrameIndices){
   return { chunks: out, removed };
 }
 
-function applyBloom(chunks, targetIndex, count, fps){
+function applyBloom(chunks, targetIndex, count, fps, windowSize = 4){
   let idx = clamp(targetIndex, 1, chunks.length - 1);
   let probe = idx, dir = 1, tries = 0;
   while (chunks[probe] && chunks[probe].type !== "delta" && tries < chunks.length){
@@ -319,11 +319,20 @@ function applyBloom(chunks, targetIndex, count, fps){
     tries++;
   }
   idx = clamp(probe, 1, chunks.length - 1);
-  const dupChunk = chunks[idx];
-  // clone data to avoid shared-reference bugs if a later op mutates in-place
-  const dupClone = { ...dupChunk, data: dupChunk.data.slice() };
+  // Duplicar o MESMO chunk repetidamente faz o decoder convergir pro mesmo
+  // resultado a cada repetição (o delta vs. si mesmo tende a zero) — trava
+  // num frame parado em vez de "esticar". Em vez disso, repetimos um pequeno
+  // JANELA de chunks delta consecutivos em ciclo: a referência nunca para de
+  // mudar entre repetições, então o movimento continua se acumulando/girando.
+  const win = [];
+  for (let k = 0; k < Math.max(1, windowSize); k++){
+    const ci = Math.min(idx + k, chunks.length - 1);
+    win.push({ ...chunks[ci], data: chunks[ci].data.slice() });
+  }
+  const inserted = [];
+  for (let k = 0; k < count; k++) inserted.push(win[k % win.length]);
   const out = chunks.slice(0, idx + 1)
-    .concat(new Array(count).fill(dupClone))
+    .concat(inserted)
     .concat(chunks.slice(idx + 1))
     .map((c, i) => ({ ...c, timestamp: Math.round(i * 1e6 / fps) }));
   return { chunks: out, targetUsed: idx };
@@ -612,7 +621,7 @@ function applyBitstreamLayers(chunks, fps, rng){
       working = r.chunks;
       notes.push(`melt(${cuts.join(",")}): -${r.removed} keys`);
     } else if (layer.type === "bloom"){
-      const r = applyBloom(working, +layer.targetFrame, +layer.count, fps);
+      const r = applyBloom(working, +layer.targetFrame, +layer.count, fps, +layer.window || 4);
       working = r.chunks;
       notes.push(`bloom(@${r.targetUsed}×${layer.count})`);
     } else if (layer.type === "corrupt"){
@@ -728,8 +737,8 @@ function buildLayerCard(layer, index){
   card.dataset.id = layer.id;
   card.draggable = true;
 
-  const badge = { src:"src", pix:"pix", bit:"bit" }[layer.kind];
-  const kindLabel = { src:"fonte", pix:"pixel fx", bit:"bitstream" }[layer.kind];
+  const badge = { src:"src", pixelfx:"pix", bitstream:"bit" }[layer.kind];
+  const kindLabel = { src:"fonte", pixelfx:"pixel fx", bitstream:"bitstream" }[layer.kind];
 
   card.innerHTML = `
     <div class="lc-head">
@@ -1084,10 +1093,14 @@ function buildLayerParams(container, layer){
       <label>Repetições (Nx) <span class="val lc-count-val">${layer.count}</span>
         <input type="range" class="lc-count" min="2" max="60" value="${layer.count}">
       </label>
-      <div class="hint">Duplica um P-frame N vezes — pixels esticam/pulsam.</div>
+      <label>Janela <span class="val lc-window-val">${layer.window}</span>
+        <input type="range" class="lc-window" min="1" max="12" value="${layer.window}">
+      </label>
+      <div class="hint">Cicla N frames delta em loop — janela 1 trava num frame parado; janela maior mantém o movimento se acumulando/repetindo.</div>
     `;
     container.querySelector(".lc-target").oninput = (e) => { layer.targetFrame = +e.target.value; container.querySelector(".lc-target-val").textContent = e.target.value; markBitstreamDirty(); };
     container.querySelector(".lc-count").oninput = (e) => { layer.count = +e.target.value; container.querySelector(".lc-count-val").textContent = e.target.value; markBitstreamDirty(); };
+    container.querySelector(".lc-window").oninput = (e) => { layer.window = +e.target.value; container.querySelector(".lc-window-val").textContent = e.target.value; markBitstreamDirty(); };
   }
   else if (layer.type === "corrupt"){
     container.innerHTML = `

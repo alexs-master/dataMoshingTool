@@ -6,6 +6,40 @@
 
 ---
 
+## 2026-06-20 (sáb) — Corrige bloom "congelando" em vez de esticar + badge "undefined" + push da branch
+
+- **Bug do usuário:** "o efeito bloom não está fazendo isso, o vídeo simplesmente para por alguns
+  frames." Reproduzi com teste isolado (vídeo sintético com quadrado em movimento linear constante,
+  WebCodecs puro, sem passar pela UI): `applyBloom` duplicava o **mesmo chunk delta** N vezes. Medi
+  a posição do quadrado por frame decodificado — resultado: a posição **trava num valor fixo por
+  ~25 frames seguidos** (congelamento real, não simulado). Causa: repetir bytes idênticos de um
+  P-frame faz o decoder convergir pro mesmo resultado a cada repetição (o delta vs. si mesmo tende
+  a zero) — trava num frame parado em vez de esticar.
+  - **Fix:** `applyBloom` agora cicla uma **janela de N chunks delta consecutivos** (não um só),
+    repetida em loop, em vez de duplicar um único chunk. Como a referência nunca para de mudar
+    entre repetições, o movimento continua se acumulando/repetindo. Testado com o mesmo harness
+    (mesma posição rastreada): em vez de travar em 48, agora cicla 48→63→78→93→48→63→... —
+    movimento contínuo, sem congelamento. Novo parâmetro de camada `layer.window` (slider "Janela",
+    1–12, default 4; window=1 reproduz o comportamento antigo de congelar).
+  - Arquivos: `applyBloom()` (assinatura ganhou `windowSize`), default do layer `bloom` (`window:4`),
+    chamada em `applyBitstreamLayers`, UI do card (novo slider `.lc-window`).
+- **Bug secundário (achado no mesmo teste):** badge da camada mostrava literalmente "undefined"
+  para camadas `pixelfx`/`bitstream` — o mapa de label usava chaves erradas (`pix`/`bit` em vez de
+  `pixelfx`/`bitstream`, que são os valores reais de `layer.kind`). Corrigido.
+- **Botão de excluir camada:** usuário relatou que sumiu. Testei o `.lc-del` (✕ no canto do card) —
+  está presente no HTML, com handler funcional (testei clicando programaticamente: removeu a
+  camada, liberou `layer.src.input`/`layer.bitmap`, sem erro). Não encontrei regressão — instruí o
+  usuário a confirmar com um hard-refresh (pode ser cache do navegador numa versão antiga).
+- **Branch não estava no remoto:** o commit anterior (`86a5160`, fix do decode com bitstream) nunca
+  tinha sido pushado. Rodei `git push origin feat/layer-system` antes de seguir.
+- Verificado no navegador real (preview): vídeo sintético com movimento forte → bloom (target=30,
+  count=25, window=4) → Aplicar → Play → posição do quadrado rastreada por pixel a cada ~80ms,
+  progressão contínua confirmada, sem erros de console.
+- **Próximo passo:** pedir pro usuário testar o bloom de novo no navegador dele e confirmar se o
+  visual agora corresponde ao esperado (e se o botão ✕ aparece após hard-refresh).
+
+---
+
 ## 2026-06-20 (sáb) — Retomo o projeto (sessão Claude) + correção do bug "decode falha com bitstream"
 
 - **Contexto:** usuário trabalhou o sistema de camadas numa sessão paralela (outro assistente) e
