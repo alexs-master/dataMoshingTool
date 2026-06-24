@@ -122,6 +122,29 @@
   riscos marcados como resolvidos), `00-MASTER.md` (status, próxima ação, seção de riscos
   reescrita como "resultado"), `DEVLOG.md` (entrada detalhada com todos os números do experimento).
 
+### Fase 11 — Bloco 0+2: `index.html` real, testado no navegador, 3 bugs corrigidos (2026-06-19)
+- Construído o `index.html` de verdade (build limpo): UI própria, núcleo de bitstream embutido
+  com os parâmetros do Bloco 1, glitch de imagem (pixel sort ASDF + RGB shift).
+- Em vez de só escrever o código, **testei rodando no navegador de verdade** — gerei um vídeo de
+  teste sintético (via WebCodecs/Mediabunny), injetei no upload real, e segui o pipeline rodar.
+- **3 bugs reais encontrados e corrigidos durante o teste**, todos documentados em detalhe no
+  `DEVLOG.md` (entrada 2026-06-19, Bloco 0+2):
+  1. Ingestão de vídeo via `<video>`+seek nunca carregava (travava em `loadedmetadata`) mesmo com
+     arquivo MP4 estruturalmente válido — confirmado comparando com decode via Mediabunny
+     `Input`+`CanvasSink` (WebCodecs puro), que funcionou perfeitamente no mesmo arquivo.
+     **Correção:** ingestão de vídeo migrada inteiramente para demux via Mediabunny, sem `<video>`.
+  2. Export MP4 falhava porque o primeiro pacote enviado ao `EncodedVideoPacketSource` do
+     Mediabunny precisa do `decoderConfig` (avcC) como metadata — resolve o risco #2 que tinha
+     ficado pendente no Bloco 1.
+  3. Preview ao vivo travava silenciosamente: `VideoFrame`s decodificados ficavam acumulados sem
+     fechar (para tocar em loop depois) e esgotavam o pool de buffers do decoder de hardware.
+     **Correção:** converter cada frame em `ImageBitmap` e fechar o `VideoFrame` na hora.
+- **Lição de processo registrada:** quando algo trava sem erro, reproduzir a mesma lógica isolada
+  com logging em cada etapa (fora da estrutura de callbacks do app) revela o ponto exato do bug
+  por comparação — foi assim que o bug #3 foi encontrado.
+- Artefatos de debug (vídeo de teste, scripts de inspeção de MP4, servidor HTTP ad-hoc) foram
+  removidos antes do commit; `.gitignore` atualizado para preveni-los no futuro.
+
 ---
 
 ## Decisões-chave (resumo)
@@ -139,6 +162,8 @@
 | D9 | Repositório **público** no GitHub (conta `alexs-master`) | Habilitar sessões na nuvem; escolha do usuário | 9 |
 | D10 | Decoder de preview/playback sempre com `hardwareAcceleration:'prefer-hardware'` | Decoder de software aborta bloom/corrupt por validação estrita de `frame_num`; hardware tolera via concealment e revela o glitch real (achado empírico) | 10 |
 | D11 | Corrupção de bytes com piso de densidade segura (stride ~15–20) na UI | Densidade maior derruba o decode mesmo em hardware (achado empírico) | 10 |
+| D12 | Ingestão de vídeo via **demux Mediabunny** (`Input`+`CanvasSink`), não `<video>`+seek | `<video>` falhava em carregar mesmo MP4 válido nos testes; WebCodecs/Mediabunny decodificou o mesmo arquivo sem problema (achado empírico) | 11 |
+| D13 | Frames de preview convertidos em `ImageBitmap` e o `VideoFrame` fechado na hora | Manter `VideoFrame`s abertos p/ tocar em loop esgota o pool de buffers do decoder de hardware e trava o decode sem erro (achado empírico) | 11 |
 
 ---
 

@@ -6,6 +6,162 @@
 
 ---
 
+## 2026-06-19 (sex) — Play/Pause + preview "ao vivo" (encode em cache, mosh reaplica sozinho)
+
+- 🔁 **Pergunta do usuário:** por que não tem play/pause, e por que os efeitos não são aplicados
+  em tempo real?
+- **Play/Pause**: era só uma funcionalidade que faltava expor — o mecanismo (`previewLoopToken`)
+  já existia. Adicionado botão (`▶`/`⏸`), estado `previewPlaying` lido a cada frame do loop de
+  preview; **preservado entre reaplicações** (se você pausar e depois mudar um parâmetro, o
+  resultado novo aparece já pausado, não retoma sozinho).
+- **"Tempo real" dos efeitos — explicado e parcialmente resolvido:** datamosh real não é um filtro
+  instantâneo (shader) — exige encode H.264 + manipulação de bytes + decode, que leva segundos.
+  Não dá pra reagir a cada tick de um slider sendo arrastado. MAS: só o **encode** é lento, e ele
+  só precisa mudar se região/resolução/FPS/cortes de melt mudarem. Bloom, corrupt e seed atuam
+  **sobre os chunks já codificados** — são rápidos.
+- **Refatoração:** `applyVideoMosh` virou duas partes — `ensureEncoded()` (lento, cacheado por
+  assinatura de região+resolução+fps+corte; só roda nova vez se algo disso mudar) e a manipulação
+  de mosh + decode (rápida, sempre roda de novo). Cache invalidado ao carregar um vídeo novo
+  (`cachedEncode = null` em `handleFile`, senão um vídeo novo podia reusar chunks do anterior).
+- **Auto-reaplicar (debounce):** mudar qualquer checkbox/slider/seed de mosh (vídeo) ou de glitch
+  (foto) dispara o reprocessamento sozinho — sem precisar clicar "Aplicar" de novo. Vídeo usa
+  debounce de 250ms; foto (sem encode/decode, puro `ImageData`) usa 80ms. Arrastar a região na
+  timeline só atualiza a prévia leve (frame cru) durante o arraste — o reencode completo roda
+  uma vez só, ao **soltar**.
+- **Medido no preview do navegador:** 1º apply de um vídeo de 3s/72 frames = ~4000ms (encode
+  completo). Ativar bloom depois (sem clicar Aplicar) = **453ms** até "Pronto" — quase 9x mais
+  rápido, porque reusa o encode em cache. Foto: glitch reaplicado automaticamente ao mudar
+  intensidade do RGB shift, sem clique nenhum.
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
+## 2026-06-19 (sex) — Redesenho do trim: dropdown de duração + região arrastável na timeline
+
+- 🔁 **Pedido do usuário, revisando a 1ª versão do slider de trim:** o limite do loop volta a ser
+  um **dropdown** (não slider livre), e a região escolhida deve aparecer destacada numa **barra
+  de timeline**, arrastável **inteira** (clicar na região e mover, não redimensionar por alças).
+- Removido o trim de duas alças (`<input type=range>` sobrepostos) da iteração anterior.
+  Substituído por:
+  - `<select id="durSelect">` com presets fixos (1/2/3/4/5/6/8s) — define a LARGURA da janela.
+  - `#timelineBar` / `#timelineRegion`: barra representando o vídeo inteiro, com a região
+    destacada (largura proporcional à duração escolhida) arrastável via **Pointer Events**
+    (`pointerdown`/`pointermove`/`pointerup` + `setPointerCapture`, funciona com mouse e touch).
+  - `regionOffset` (estado) substitui os antigos `regionStart`/`regionEnd` independentes — agora
+    é só o início da janela; o fim é sempre `regionOffset + project.duration`.
+- Mantido da iteração anterior: preview ao vivo do frame sob a região durante o arraste/troca de
+  duração (`showRegionPreviewFrame`), e o `fileLoadToken` que corrige a race condition de troca
+  rápida de arquivo.
+- **Verificado no preview do navegador** com vídeo de teste de 10s (bandas de cor a cada 2,5s):
+  - Trocar duração no dropdown (3s→5s): região passa de 30% para 50% de largura, frameCount
+    120 ✓.
+  - Arrastar a região (offset 0→3s): `"3.0s – 8.0s"`, largura mantida em 50% ✓.
+  - Arrastar além do fim do vídeo: trava em `"5.0s – 10.0s"` (não deixa passar) ✓.
+  - Aplicar mosh na região 5–10s: pixel central do resultado decodificado bate com a banda verde
+    esperada (~rgb(16,128,64), banda 5–7,5s), confirmando que usa a região certa, não o início ✓.
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
+## 2026-06-19 (sex) — Slider de região (trim) do vídeo
+
+- ✅ **Pedido do usuário:** precisa dar pra escolher QUAL trecho do vídeo enviado é usado, não
+  sempre o início. Antes, a "Duração a usar" só definia quantos segundos a partir de t=0.
+- Implementado um **trim-slider de duas alças** (técnica clássica de dois `<input type=range>`
+  sobrepostos, com `pointer-events:none` no input e `pointer-events:all` só no thumb) — substitui
+  o antigo slider único de duração. Mostra início/fim/duração (`0.0s – 3.0s (3.0s)`), barra de
+  preenchimento visual entre as alças, e teto de 8s para o trecho selecionável (igual ao limite
+  antigo, agora aplicado à LARGURA da região, não mais fixo a partir de t=0).
+- **Bônus de UX:** a alça que está sendo arrastada atualiza o canvas com o frame exato sob ela —
+  sem isso o slider ficaria "cego" (só veria o resultado depois de clicar Aplicar).
+- `applyVideoMosh` (`drawFrame`) agora amostra a partir de `regionStart`, não de 0 — confirmado por
+  pixel: aplicando numa região 4–7s de um vídeo de teste com bandas de cor por trecho de tempo, o
+  resultado decodificado mostrou a cor da banda 4–7s (laranja), não a do início (azul).
+- 🐛 **Bug encontrado e corrigido durante o teste (não relacionado ao slider em si):** ao disparar
+  carregamentos de arquivo em sequência rápida (sem esperar o anterior terminar — foi assim que
+  achei, testando rápido demais), `handleFile` tinha uma race condition real: a Promise mais lenta
+  de uma carga antiga podia resolver DEPOIS de uma carga mais nova e sobrescrever o estado (causou
+  valores bizarros tipo `max="105.0"` numa repetição do teste). **Corrigido** com um
+  `fileLoadToken` (mesmo padrão do `previewLoopToken`/`stopPreviewLoop` já usado no preview):
+  cargas obsoletas se auto-descartam ao perceber que uma carga mais nova já começou.
+- **Verificado no preview do navegador**, sempre aguardando cada operação assíncrona terminar
+  antes da próxima (a 1ª rodada de teste, sem aguardar, expôs o bug da race condition acima —
+  ensina a sempre serializar os passos ao testar fluxos assíncronos manualmente).
+- ➡️ Próximo: Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
+## 2026-06-19 (sex) — Fix: canvas não adaptava ao vídeo + vazamento entre modos Vídeo/Foto
+
+- 🐛 **Reportado pelo usuário, testando a build do PR #1:** (1) canvas do stage não ajustava
+  resolução/proporção à fonte de vídeo; (2) ao trocar de Vídeo→Foto com um vídeo carregado, o
+  vídeo continuava aparecendo por cima da foto; (3) ao voltar de Foto→Vídeo, o vídeo "herdava" a
+  proporção da foto.
+- **Causas-raiz (2, compartilhadas pelos 3 sintomas):**
+  1. A ingestão de vídeo nunca recalculava `project.width/height` a partir da fonte — só a
+     ingestão de foto fazia isso. Por isso o vídeo sempre usava as dimensões padrão (480×270) ou
+     o que sobrasse de um carregamento anterior de foto.
+  2. O loop de animação do preview (`requestAnimationFrame`) nunca era invalidado ao trocar de
+     modo ou carregar um novo arquivo — o `previewLoopToken` só era incrementado dentro do próprio
+     `playPreview`. Como o canvas é compartilhado entre os dois modos, o loop antigo continuava
+     redesenhando frames de vídeo por cima do que quer que o modo Foto desenhasse depois.
+- **Correção:**
+  - Novo helper `fitProjectSize(srcW, srcH, maxDim)` — calcula `project.width/height` a partir da
+    proporção real da fonte; usado igualmente nos dois modos (antes só a foto tinha essa lógica,
+    duplicada inline).
+  - Novo helper `stopPreviewLoop()` (incrementa `previewLoopToken`) chamado no início de
+    `setMode()` e de `handleFile()` — garante que qualquer loop de preview anterior pare antes de
+    trocar de modo ou carregar um arquivo novo.
+- **Verificado no preview do navegador** (não só lido): vídeo sintético 320×180 → canvas
+  480×270 (proporção 1.778 ✓). Troca para Foto com imagem 200×300 → canvas 320×480 (proporção
+  0.667 ✓), pixel central confirmado com a cor real da foto (sem vídeo vazando, pixel idêntico
+  antes/depois de 800ms ocioso). Volta para Vídeo e recarrega → canvas 480×270 de novo (não ficou
+  preso na proporção da foto). Fluxo de aplicar mosh + export re-testado, continua funcionando.
+- ➡️ Próximo: commit no branch do PR #1 (`feat/datamosh-core-mvp`); depois Bloco 3 (UI de
+  camadas/blend) e Bloco 4 (validar export real fora do ambiente de teste).
+
+---
+
+## 2026-06-19 (sex) — Bloco 0+2: `index.html` real construído, testado no navegador, 2 bugs encontrados e corrigidos
+
+- ✅ Criado `index.html` (build limpo, conforme diretriz — não fork do Loop Lab): shell de UI
+  própria (tabs Vídeo/Foto, upload, painel de mosh, preview, export), núcleo de bitstream
+  embutido (encode→melt/bloom/corrupt→mux/decode com os parâmetros validados no Bloco 1),
+  glitch de imagem (pixel sort ASDF + RGB shift).
+- ✅ **Testado de ponta a ponta no navegador de verdade** (Chrome via automação), não só lido.
+  Gerei um vídeo de teste sintético (encode→mux MP4 via WebCodecs/Mediabunny), injetei no input
+  de upload real, e acompanhei o pipeline completo rodar.
+- 🐛 **Bug real #1 encontrado:** a ingestão de vídeo usava `<video>`+seek (decode-by-seek), igual
+  ao Loop Lab. Nesse ambiente de teste, a tag `<video>` nunca disparava `loadedmetadata` para o
+  MP4 gerado (`networkState` preso em LOADING), mesmo com o arquivo estruturalmente válido
+  (confirmado byte a byte: ftyp/moov/mdat corretos, avcC/SPS/PPS corretos) — confirmado depois que
+  o MESMO arquivo decodificava perfeitamente via Mediabunny `Input`+`CanvasSink` (WebCodecs puro).
+  **Correção:** trocada toda a ingestão de vídeo de `<video>`+seek para **Mediabunny demux
+  (`Input`+`CanvasSink.getCanvas(t)`)** — sem depender da tag `<video>`/HTMLMediaElement. Mais
+  consistente com a filosofia WebCodecs-first do projeto, e evita essa classe de problema também
+  para usuários reais (decoder mais permissivo que o pipeline de mídia do browser).
+- 🐛 **Bug real #2 encontrado:** o export MP4 (`EncodedVideoPacketSource.add(packet)`) lançava
+  `"Video chunk metadata must be provided"` no Mediabunny — o primeiro pacote de um track precisa
+  vir com `{decoderConfig:{codec,codedWidth,codedHeight,description}}` como 2º argumento de `add()`.
+  Isso resolve o risco #2 do Bloco 1 que estava pendente ("Mediabunny aceita packets manipulados?
+  ainda não testado"). **Corrigido** no handler de export.
+- 🐛 **Bug real #3 encontrado:** o preview ao vivo travava silenciosamente (sem erro nenhum) ao
+  aplicar o mosh. Causa: os `VideoFrame` decodificados eram empilhados num array sem `.close()`
+  (para depois tocar em loop) — decoders de **hardware** (obrigatório p/ bloom/corrupt, ver Bloco 1)
+  têm um pool pequeno de buffers; acumular frames abertos esgota o pool e o decode trava sem
+  disparar erro. **Corrigido:** cada `VideoFrame` agora é convertido em `ImageBitmap` (leve, sem
+  segurar recurso do decoder) e fechado imediatamente; o array de preview guarda os bitmaps.
+- **Método de debug que valeu a pena registrar:** quando algo trava sem erro nenhum, reproduzir a
+  mesma lógica isolada (sem a estrutura de callbacks do app) com logging explícito em cada etapa
+  revela o ponto exato da diferença. Foi assim que achei o bug #3 — a versão isolada (que fechava
+  frames na hora) funcionava, a do app (que não fechava) travava.
+- Verificado: nenhum arquivo de debug (`__debug_test.mp4`, scripts de inspeção MP4, servidor de
+  range) foi commitado — removidos antes do commit; `.gitignore` atualizado para preveni-los no futuro.
+- ➡️ Próximo: re-testar o fluxo completo após os 3 fixes (ainda não re-validado de ponta a ponta
+  após a última correção); depois Bloco 3 (UI de camadas/blend) e Bloco 4 (validar export real).
+
+---
+
 ## 2026-06-19 (sex) — BLOCO 1: núcleo validado (de-risco concluído) ✅
 
 - ✅ Protótipo do núcleo rodado **de verdade** no Chrome (via DevTools/JS, não pseudocódigo):

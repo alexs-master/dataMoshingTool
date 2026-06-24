@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Datamosh Tool</title>
+<style>
+:root{
+  --bg:#0a0a0c; --panel:#121215; --line:#262630; --txt:#e8e8ee; --dim:#8a8a96;
+  --acc:#ff2a6d; --acc2:#00e5ff; --ok:#3ddc84; --warn:#ffb300;
+  --mono:"Cascadia Code","SF Mono",Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:12.5px;display:flex;flex-direction:column;overflow:hidden}
+::selection{background:var(--acc);color:#000}
+button{font-family:var(--mono);font-size:11.5px;cursor:pointer;background:#1a1a1f;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:6px 12px}
+button:hover{border-color:var(--acc)}
+button:active{background:#222}
+button.primary{background:var(--acc);color:#000;border-color:var(--acc);font-weight:700}
+button.primary:hover{background:#ff4d83}
+button:disabled{opacity:.35;cursor:default}
+button.ghost{background:transparent}
+select,input[type=number],input[type=text]{font-family:var(--mono);font-size:11.5px;background:#0e0e11;color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:5px 7px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=checkbox]{accent-color:var(--acc)}
+label.field{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--dim);margin-bottom:9px}
+label.field .val{color:var(--acc2);font-weight:600}
+label.row{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--txt);margin-bottom:6px;cursor:pointer}
+
+/* timeline-bar: barra representando o vídeo inteiro; a região destacada (largura fixa pela
+   duração escolhida) é arrastada inteira para reposicionar o trecho usado */
+.timeline-bar{position:relative;height:34px;background:#0e0e11;border:1px solid var(--line);border-radius:6px;margin:4px 0 2px;overflow:hidden}
+.timeline-region{position:absolute;top:0;bottom:0;left:0;width:30%;background:rgba(255,42,109,.32);border:1px solid var(--acc);border-radius:4px;cursor:grab;touch-action:none}
+.timeline-region:active{cursor:grabbing;background:rgba(255,42,109,.45)}
+.timeline-region::before{content:"⋮⋮";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--acc);font-size:11px;letter-spacing:2px;opacity:.8;pointer-events:none}
+
+#topbar{display:flex;align-items:center;gap:14px;padding:9px 14px;background:#101013;border-bottom:1px solid var(--line);flex-wrap:wrap}
+#logo{font-weight:800;font-size:13px;letter-spacing:.03em}
+#logo .dot{color:var(--acc)}
+.tb-group{display:flex;align-items:center;gap:6px}
+.tb-label{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.spacer{flex:1}
+#modeTabs{display:flex;gap:4px;background:#0e0e11;border:1px solid var(--line);border-radius:6px;padding:3px}
+#modeTabs button{border:none;background:transparent;border-radius:4px;padding:5px 14px}
+#modeTabs button.active{background:var(--acc);color:#000;font-weight:700}
+
+#main{flex:1;display:flex;min-height:0}
+.panel{background:var(--panel);overflow-y:auto;flex-shrink:0;padding:14px}
+.panel h2{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+#left{width:250px;border-right:1px solid var(--line)}
+#right{width:300px;border-left:1px solid var(--line)}
+#center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;gap:12px;min-width:0}
+#stageWrap{position:relative;border:1px solid var(--line);border-radius:6px;background:#000;display:flex;align-items:center;justify-content:center;max-width:100%;max-height:calc(100vh - 220px);overflow:hidden}
+#stage{display:block;max-width:100%;max-height:calc(100vh - 220px)}
+#dropZone{width:100%;min-height:140px;border:2px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--dim);font-size:11px;text-align:center;cursor:pointer;padding:14px}
+#dropZone:hover{border-color:var(--acc);color:var(--txt)}
+#dropZone.has-file{border-style:solid;border-color:var(--ok);color:var(--txt)}
+.section{margin-bottom:18px}
+.fieldset{border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px}
+.fieldset legend{font-size:10px;color:var(--acc2);text-transform:uppercase;letter-spacing:.06em;padding:0 4px}
+#statusBar{display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--dim);width:100%}
+#statusText{flex:1}
+#progressTrack{flex:1;height:5px;background:#1a1a1f;border-radius:3px;overflow:hidden;display:none}
+#progressTrack.show{display:block}
+#progressFill{height:100%;width:0%;background:var(--acc);transition:width .1s}
+.row2{display:flex;gap:8px}
+.row2>*{flex:1}
+.hint{font-size:9.5px;color:var(--dim);line-height:1.4;margin-top:2px}
+.warn{color:var(--warn)}
+#exportRow{display:flex;gap:8px;width:100%}
+#exportRow button{flex:1}
+.hidden{display:none !important}
+a.linklike{color:var(--acc2);text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="logo"><span class="dot">●</span> DATAMOSH<span style="color:var(--acc)">TOOL</span></div>
+  <div id="modeTabs">
+    <button id="tabVideo" class="active">Vídeo</button>
+    <button id="tabPhoto">Foto</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="tb-group">
+    <span class="tb-label">Seed</span>
+    <input type="number" id="seedInput" value="1" style="width:80px">
+    <button id="randSeedBtn" title="Nova seed aleatória">🎲</button>
+  </div>
+</div>
+
+<div id="main">
+
+  <div id="left" class="panel">
+    <div class="section" id="srcSection">
+      <h2>Fonte</h2>
+      <div id="dropZone">
+        <div id="dropZoneLabel">Solte um vídeo aqui<br>ou clique para escolher</div>
+        <input type="file" id="fileInput" accept="video/*" style="display:none">
+      </div>
+      <div class="hint" id="srcInfo"></div>
+    </div>
+
+    <div class="section" id="videoTimeSection">
+      <h2>Tempo / Saída</h2>
+      <label class="field">Duração do loop
+        <select id="durSelect">
+          <option value="1">1s</option>
+          <option value="2">2s</option>
+          <option value="3" selected>3s</option>
+          <option value="4">4s</option>
+          <option value="5">5s</option>
+          <option value="6">6s</option>
+          <option value="8">8s</option>
+        </select>
+      </label>
+      <label class="field">Posição no vídeo <span class="val" id="regionVal">0.0s – 3.0s</span></label>
+      <div class="timeline-bar" id="timelineBar">
+        <div class="timeline-region" id="timelineRegion"></div>
+      </div>
+      <div class="hint">Clique na região destacada e arraste para escolher o trecho do vídeo a moshar.</div>
+      <label class="field">FPS <span class="val" id="fpsVal">24</span>
+        <input type="range" id="fpsRange" min="12" max="30" step="1" value="24">
+      </label>
+      <div class="hint">Frames a codificar: <span id="frameCount">—</span></div>
+    </div>
+  </div>
+
+  <div id="center">
+    <div id="stageWrap">
+      <canvas id="stage" width="480" height="270"></canvas>
+    </div>
+    <div id="statusBar">
+      <span id="statusText">Pronto.</span>
+      <div id="progressTrack"><div id="progressFill"></div></div>
+    </div>
+    <div id="exportRow">
+      <button id="playPauseBtn" class="ghost" disabled style="flex:0 0 auto">▶</button>
+      <button id="applyBtn" class="primary" disabled>Aplicar datamosh</button>
+      <button id="exportMp4Btn" disabled>Exportar MP4</button>
+      <button id="exportPngBtn" class="hidden">Exportar PNG</button>
+    </div>
+  </div>
+
+  <div id="right" class="panel">
+    <div id="videoMoshPanel">
+      <h2>Datamosh — Vídeo</h2>
+
+      <div class="fieldset">
+        <legend>Melt (remoção de I-frame)</legend>
+        <label class="row"><input type="checkbox" id="meltEnabled" checked> Ativar melt</label>
+        <label class="field">Cortes (frames, separados por vírgula)
+          <input type="text" id="meltCuts" value="auto" placeholder="ex: 30,60 ou auto">
+        </label>
+        <div class="hint">"auto" = um corte na metade do clipe. Remove o keyframe nesse ponto: a cena seguinte "vaza" sobre a anterior.</div>
+      </div>
+
+      <div class="fieldset">
+        <legend>Bloom (duplicação de P-frame)</legend>
+        <label class="row"><input type="checkbox" id="bloomEnabled"> Ativar bloom</label>
+        <label class="field">Frame-alvo <span class="val" id="bloomTargetVal">10</span>
+          <input type="range" id="bloomTarget" min="1" max="200" value="10">
+        </label>
+        <label class="field">Repetições (Nx) <span class="val" id="bloomCountVal">20</span>
+          <input type="range" id="bloomCount" min="2" max="60" value="20">
+        </label>
+      </div>
+
+      <div class="fieldset">
+        <legend>Corrupção</legend>
+        <label class="row"><input type="checkbox" id="corruptEnabled"> Ativar corrupção</label>
+        <label class="field">Quantidade de frames afetados <span class="val" id="corruptCountVal">3</span>
+          <input type="range" id="corruptCount" min="1" max="15" value="3">
+        </label>
+        <label class="field">Intensidade <span class="val" id="corruptIntensityVal">40</span>
+          <input type="range" id="corruptIntensity" min="0" max="100" value="40">
+        </label>
+        <div class="hint">Intensidade alta demais pode quebrar a decodificação — reduza se o preview parar antes do fim.</div>
+      </div>
+
+      <div class="hint" id="decoderWarn"></div>
+    </div>
+
+    <div id="photoMoshPanel" class="hidden">
+      <h2>Glitch — Foto</h2>
+
+      <div class="fieldset">
+        <legend>Pixel sort (ASDF)</legend>
+        <label class="row"><input type="checkbox" id="sortEnabled" checked> Ativar pixel sort</label>
+        <label class="field">Direção
+          <select id="sortDir"><option value="h">Horizontal</option><option value="v">Vertical</option></select>
+        </label>
+        <label class="field">Critério
+          <select id="sortCriterion"><option value="luma">Luminosidade</option><option value="hue">Matiz</option><option value="sat">Saturação</option></select>
+        </label>
+        <label class="field">Threshold mín. <span class="val" id="sortMinVal">60</span>
+          <input type="range" id="sortMin" min="0" max="255" value="60">
+        </label>
+        <label class="field">Threshold máx. <span class="val" id="sortMaxVal">200</span>
+          <input type="range" id="sortMax" min="0" max="255" value="200">
+        </label>
+      </div>
+
+      <div class="fieldset">
+        <legend>RGB channel shift</legend>
+        <label class="row"><input type="checkbox" id="rgbEnabled"> Ativar deslocamento</label>
+        <label class="field">Ângulo (°) <span class="val" id="rgbAngleVal">0</span>
+          <input type="range" id="rgbAngle" min="0" max="360" value="0">
+        </label>
+        <label class="field">Intensidade (px) <span class="val" id="rgbAmountVal">8</span>
+          <input type="range" id="rgbAmount" min="0" max="60" value="8">
+        </label>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+/* ============================================================
+   DATAMOSH TOOL — núcleo
+   Build limpo, feito para datamoshing. Sem geradores/efeitos
+   artísticos portados — só mecanismos de timing/seed/I-O e o
+   núcleo de bitstream (validado empiricamente no Bloco 1).
+   ============================================================ */
+
+/* ---------- RNG com seed (determinismo) ---------- */
+function hashInt(x){ x = Math.imul(x ^ x>>>16, 0x45d9f3b); x = Math.imul(x ^ x>>>16, 0x45d9f3b); return (x ^ x>>>16)>>>0; }
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = (t + Math.imul(t ^ t >>> 7, 61 | t)) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+
+const project = { width: 480, height: 270, fps: 24, duration: 3, seed: 1 };
+
+/* ---------- utils de export ---------- */
+function downloadBlob(blob, name){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+
+/* ============================================================
+   NÚCLEO DE BITSTREAM — Etapa 2 (datamosh real)
+   Parâmetros validados no Bloco 1 (ver docs/PLAN.md §2, DEVLOG.md 2026-06-19)
+   ============================================================ */
+
+const CODEC = "avc1.42001f"; // H.264 baseline
+
+/** Codifica uma sequência de frames (drawFrame(i, ctx)) com GOP controlado.
+ *  keyFrameIndices: Set de índices que devem ser keyframe (sempre inclui 0). */
+async function encodeFrames(totalFrames, fps, w, h, drawFrame, keyFrameIndices, onProgress){
+  const chunks = [];
+  let decoderDescription = null;
+  let encErr = null;
+  const enc = new VideoEncoder({
+    output: (chunk, meta) => {
+      if (meta && meta.decoderConfig && meta.decoderConfig.description && !decoderDescription) {
+        decoderDescription = meta.decoderConfig.description;
+      }
+      const buf = new Uint8Array(chunk.byteLength);
+      chunk.copyTo(buf);
+      chunks.push({ type: chunk.type, timestamp: chunk.timestamp, duration: chunk.duration, data: buf });
+    },
+    error: (e) => { encErr = e.message; }
+  });
+  const W = Math.max(2, Math.round(w/2)*2), H = Math.max(2, Math.round(h/2)*2);
+  enc.configure({
+    codec: CODEC, width: W, height: H,
+    bitrate: Math.min(20_000_000, Math.max(1_500_000, Math.round(W*H*fps*0.12))),
+    framerate: fps, latencyMode: "realtime", avc: { format: "avc" }
+  });
+
+  const canvas = new OffscreenCanvas(W, H);
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+  for (let i = 0; i < totalFrames; i++){
+    await drawFrame(i, ctx, W, H);
+    const vf = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / fps) });
+    enc.encode(vf, { keyFrame: keyFrameIndices.has(i) });
+    vf.close();
+    if (onProgress && i % 4 === 0) onProgress(i / totalFrames * 0.5);
+    if (encErr) break;
+  }
+  await enc.flush();
+  enc.close();
+  if (encErr) throw new Error("Encoder: " + encErr);
+  return { chunks, decoderDescription, width: W, height: H };
+}
+
+/** Aplica MELT: remove o(s) keyframe(s) nos índices de corte (mantém o frame 0). */
+function applyMelt(chunks, cutFrameIndices){
+  const cuts = new Set(cutFrameIndices);
+  let removed = 0;
+  const out = chunks.filter((c, i) => {
+    if (i === 0) return true;
+    if (c.type === "key" && cuts.has(i)) { removed++; return false; }
+    return true;
+  });
+  return { chunks: out, removed };
+}
+
+/** Aplica BLOOM: duplica o chunk delta mais próximo de targetIndex, `count` vezes, e retimestampa. */
+function applyBloom(chunks, targetIndex, count, fps){
+  let idx = clamp(targetIndex, 1, chunks.length - 1);
+  // acha o delta mais próximo (não pode duplicar um key sem quebrar tudo)
+  let probe = idx, dir = 1, tries = 0;
+  while (chunks[probe] && chunks[probe].type !== "delta" && tries < chunks.length){
+    probe += dir; if (probe < 0 || probe >= chunks.length){ dir = -dir; probe = idx; }
+    tries++;
+  }
+  idx = clamp(probe, 1, chunks.length - 1);
+  const dupChunk = chunks[idx];
+  const out = chunks.slice(0, idx + 1)
+    .concat(new Array(count).fill(dupChunk))
+    .concat(chunks.slice(idx + 1))
+    .map((c, i) => ({ ...c, timestamp: Math.round(i * 1e6 / fps) }));
+  return { chunks: out, targetUsed: idx };
+}
+
+/** Aplica CORRUPÇÃO: XOR esparso em N chunks delta (stride mínimo seguro ~15-20, validado no Bloco 1). */
+function applyCorrupt(chunks, count, intensity01, rng){
+  // intensity 0..1 -> stride entre 30 (leve) e 15 (no limite seguro). Abaixo de 15 quebra o decode.
+  const stride = Math.round(30 - intensity01 * 15);
+  const xorVal = 0x40 + Math.round(intensity01 * 0xB0);
+  const deltaIdxs = chunks.map((c,i)=>c.type==="delta"?i:-1).filter(i=>i>=0);
+  const chosen = new Set();
+  let guard = 0;
+  while (chosen.size < Math.min(count, deltaIdxs.length) && guard < 500){
+    chosen.add(deltaIdxs[Math.floor(rng() * deltaIdxs.length)]);
+    guard++;
+  }
+  const out = chunks.map((c, i) => {
+    if (!chosen.has(i)) return c;
+    const d = new Uint8Array(c.data);
+    for (let k = 6; k < d.length; k += stride) d[k] ^= xorVal;
+    return { ...c, data: d };
+  });
+  return { chunks: out, affected: [...chosen], stride };
+}
+
+/** Decodifica chunks já moshados, chamando onFrame(VideoFrame) por frame.
+ *  hardwareAcceleration:'prefer-hardware' é OBRIGATÓRIO — validado no Bloco 1:
+ *  decoder de software aborta em bloom/corrupt por validação estrita de frame_num. */
+function decodeChunks(chunks, decoderDescription, w, h, onFrame, onDone, onError){
+  let errored = false;
+  let decodedCount = 0;
+  const dec = new VideoDecoder({
+    output: (vf) => { decodedCount++; onFrame(vf); },
+    error: (e) => { errored = true; onError && onError(e.message, decodedCount); }
+  });
+  dec.configure({
+    codec: CODEC, codedWidth: w, codedHeight: h,
+    description: decoderDescription,
+    hardwareAcceleration: "prefer-hardware"
+  });
+  (async () => {
+    for (const c of chunks){
+      if (errored) break;
+      try {
+        dec.decode(new EncodedVideoChunk({ type: c.type, timestamp: c.timestamp, duration: c.duration, data: c.data }));
+      } catch(e){ errored = true; onError && onError("throw:" + e.message, decodedCount); break; }
+    }
+    if (!errored){ try { await dec.flush(); } catch(e){ onError && onError("flush:" + e.message, decodedCount); } }
+    try { if (dec.state !== "closed") dec.close(); } catch(e){}
+    onDone && onDone(decodedCount, errored);
+  })();
+}
+
+/* ============================================================
+   PRODUTOR DE FRAMES — vídeo enviado (demux via Mediabunny/WebCodecs)
+   Decide de propósito NÃO usar <video>+seek: a tag <video> depende do
+   pipeline de mídia do navegador (HTMLMediaElement), que se mostrou
+   pouco confiável em testes. Demuxar com Mediabunny (que já usamos
+   para o export) e decodificar via WebCodecs é o caminho consistente
+   com o resto do núcleo — mesma tecnologia ponta a ponta.
+   ============================================================ */
+
+let _mbModule = null;
+async function loadMediabunny(){
+  if (!_mbModule) _mbModule = await import("https://cdn.jsdelivr.net/npm/mediabunny/+esm");
+  return _mbModule;
+}
+
+/** Carrega um arquivo de vídeo via demux (não usa <video>).
+ *  Retorna { input, track, duration, width, height, sink, getFrameCanvas(t) }. */
+async function loadVideoFile(file){
+  const mb = await loadMediabunny();
+  const { Input, ALL_FORMATS, BlobSource, CanvasSink } = mb;
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+  const track = await input.getPrimaryVideoTrack();
+  if (!track) throw new Error("Nenhuma faixa de vídeo encontrada no arquivo.");
+  const duration = await input.computeDuration();
+  const width = track.displayWidth, height = track.displayHeight;
+  const sink = new CanvasSink(track, { width, height, fit: "fill" });
+  return {
+    input, track, duration, width, height,
+    async getFrameCanvas(t){
+      const wrapped = await sink.getCanvas(Math.max(0, Math.min(t, duration - 0.001)));
+      return wrapped ? wrapped.canvas : null;
+    }
+  };
+}
+
+/* ============================================================
+   GLITCH DE IMAGEM (Etapa 1 — pixel-level, código novo)
+   ============================================================ */
+
+function luma(r,g,b){ return 0.2126*r + 0.7152*g + 0.0722*b; }
+function rgb2hue(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b); let h=0;
+  const d=max-min;
+  if(d!==0){
+    if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  return h;
+}
+function rgb2sat(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  return max===0 ? 0 : (max-min)/max;
+}
+
+/** Pixel sort estilo ASDF (Kim Asendorf): por linha/coluna, ordena trechos
+ *  delimitados por threshold[min,max] do critério escolhido. */
+function pixelSort(imgData, w, h, opts){
+  const { dir, criterion, min, max } = opts;
+  const d = imgData.data;
+  const metric = (i) => {
+    const r=d[i], g=d[i+1], b=d[i+2];
+    if (criterion === "hue") return rgb2hue(r,g,b) / 360 * 255;
+    if (criterion === "sat") return rgb2sat(r,g,b) * 255;
+    return luma(r,g,b);
+  };
+  function sortRun(getIdx, len){
+    let start = -1;
+    for (let p = 0; p <= len; p++){
+      const idx = p < len ? getIdx(p) : -1;
+      const inRange = p < len && (() => { const m = metric(idx); return m >= min && m <= max; })();
+      if (inRange && start === -1) start = p;
+      else if (!inRange && start !== -1){
+        const segLen = p - start;
+        if (segLen > 1){
+          const idxs = []; for (let k=start;k<p;k++) idxs.push(getIdx(k));
+          const pixels = idxs.map(ix => [d[ix],d[ix+1],d[ix+2],d[ix+3]]);
+          pixels.sort((a,b2) => luma(a[0],a[1],a[2]) - luma(b2[0],b2[1],b2[2]));
+          idxs.forEach((ix, k) => { d[ix]=pixels[k][0]; d[ix+1]=pixels[k][1]; d[ix+2]=pixels[k][2]; d[ix+3]=pixels[k][3]; });
+        }
+        start = -1;
+      }
+    }
+  }
+  if (dir === "h"){
+    for (let y=0;y<h;y++) sortRun((x)=> (y*w+x)*4, w);
+  } else {
+    for (let x=0;x<w;x++) sortRun((y)=> (y*w+x)*4, h);
+  }
+}
+
+/** Desloca canais R/G/B por um vetor (ângulo+intensidade), wrap nas bordas. */
+function rgbShift(imgData, w, h, angleDeg, amount){
+  const src = new Uint8ClampedArray(imgData.data);
+  const d = imgData.data;
+  const rad = angleDeg * Math.PI / 180;
+  const dxR = Math.round(Math.cos(rad) * amount), dyR = Math.round(Math.sin(rad) * amount);
+  const dxB = -dxR, dyB = -dyR;
+  const wrap = (v,m) => ((v % m) + m) % m;
+  for (let y=0;y<h;y++){
+    for (let x=0;x<w;x++){
+      const di = (y*w+x)*4;
+      const rx = wrap(x+dxR,w), ry = wrap(y+dyR,h);
+      const bx = wrap(x+dxB,w), by = wrap(y+dyB,h);
+      d[di]   = src[(ry*w+rx)*4];
+      d[di+2] = src[(by*w+bx)*4+2];
+    }
+  }
+}
+
+/* ============================================================
+   ESTADO DA UI
+   ============================================================ */
+
+const $ = (id) => document.getElementById(id);
+let mode = "video";          // "video" | "photo"
+let videoFile = null, videoSrc = null; // videoSrc = { input, track, duration, width, height, getFrameCanvas }
+let imageFile = null, imageBitmap = null;
+let lastMoshResult = null;   // { chunks, decoderDescription, width, height, fps }
+let lastPhotoResult = null;  // canvas with the glitched image
+let regionOffset = 0;        // início do trecho usado, em segundos a partir do começo do vídeo
+let cachedEncode = null;     // { chunks, decoderDescription, width, height, fps, cutIdx, total, sig } — etapa lenta cacheada
+let previewPlaying = true;   // estado do play/pause, preservado entre reaplicações de mosh
+
+function setStatus(text){ $("statusText").textContent = text; }
+function setProgress(p){
+  const track = $("progressTrack"), fill = $("progressFill");
+  if (p == null){ track.classList.remove("show"); return; }
+  track.classList.add("show");
+  fill.style.width = clamp(p,0,1)*100 + "%";
+}
+
+/** Ajusta project.width/height para caber a proporção da fonte (vídeo OU foto)
+ *  dentro de um quadro máximo — mesma lógica para os dois modos. */
+function fitProjectSize(srcW, srcH, maxDim){
+  maxDim = maxDim || 480;
+  const ar = srcW / srcH;
+  project.width = ar >= 1 ? maxDim : Math.round(maxDim * ar);
+  project.height = ar >= 1 ? Math.round(maxDim / ar) : maxDim;
+}
+
+/** Invalida qualquer loop de preview (rAF) em andamento — chamado ao trocar de
+ *  modo ou carregar um novo arquivo, para o frame antigo parar de ser desenhado
+ *  por cima do conteúdo novo (canvas é compartilhado entre os dois modos). */
+let previewLoopToken = 0;
+function stopPreviewLoop(){ previewLoopToken++; }
+
+/* ---------- tabs de modo ---------- */
+$("tabVideo").onclick = () => setMode("video");
+$("tabPhoto").onclick = () => setMode("photo");
+function setMode(m){
+  stopPreviewLoop(); // o canvas é compartilhado entre os dois modos
+  mode = m;
+  $("tabVideo").classList.toggle("active", m==="video");
+  $("tabPhoto").classList.toggle("active", m==="photo");
+  $("videoTimeSection").classList.toggle("hidden", m!=="video");
+  $("videoMoshPanel").classList.toggle("hidden", m!=="video");
+  $("photoMoshPanel").classList.toggle("hidden", m!=="photo");
+  $("exportMp4Btn").classList.toggle("hidden", m!=="video");
+  $("exportPngBtn").classList.toggle("hidden", m!=="photo");
+  $("fileInput").accept = m==="video" ? "video/*" : "image/*";
+  $("dropZoneLabel").innerHTML = m==="video"
+    ? "Solte um vídeo aqui<br>ou clique para escolher"
+    : "Solte uma foto aqui<br>ou clique para escolher";
+  $("dropZone").classList.remove("has-file");
+  $("applyBtn").disabled = true;
+  $("exportMp4Btn").disabled = true;
+  $("playPauseBtn").disabled = true;
+  $("playPauseBtn").classList.toggle("hidden", m!=="video");
+  setStatus("Pronto.");
+  drawPlaceholder();
+}
+
+function drawPlaceholder(){
+  const c = $("stage"); c.width = project.width; c.height = project.height;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#000"; ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle = "#3a3a44"; ctx.font = "13px monospace"; ctx.textAlign = "center";
+  ctx.fillText(mode === "video" ? "envie um vídeo" : "envie uma foto", c.width/2, c.height/2);
+}
+drawPlaceholder();
+
+/* ---------- upload ---------- */
+$("dropZone").onclick = () => $("fileInput").click();
+$("dropZone").ondragover = (e) => { e.preventDefault(); };
+$("dropZone").ondrop = (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+};
+$("fileInput").onchange = (e) => { if (e.target.files[0]) handleFile(e.target.files[0]); };
+
+let fileLoadToken = 0; // descarta cargas antigas se o usuário trocar de arquivo antes da anterior terminar
+async function handleFile(file){
+  const myFileToken = ++fileLoadToken;
+  stopPreviewLoop(); // garante que nenhum preview antigo continue desenhando por cima
+  $("dropZone").classList.add("has-file");
+  lastMoshResult = null; lastPhotoResult = null;
+  $("exportMp4Btn").disabled = true; $("exportPngBtn").disabled = true;
+  if (mode === "video"){
+    videoFile = file;
+    setStatus("Carregando vídeo (demux)…");
+    try {
+      const loaded = await loadVideoFile(file);
+      if (myFileToken !== fileLoadToken) return; // uma carga mais nova já começou
+      videoSrc = loaded;
+      cachedEncode = null; // vídeo novo — invalida qualquer encode em cache do vídeo anterior
+      fitProjectSize(videoSrc.width, videoSrc.height);
+      $("srcInfo").textContent = `${videoSrc.width}×${videoSrc.height} · ${videoSrc.duration.toFixed(1)}s`;
+      regionOffset = 0;
+      project.duration = Math.min(+$("durSelect").value, videoSrc.duration);
+      updateTimelineUI();
+      $("applyBtn").disabled = false;
+      setStatus("Vídeo carregado. Ajuste os parâmetros e clique em Aplicar.");
+      // desenha 1 frame de prévia, já no tamanho/proporção certos
+      const previewCanvas = await videoSrc.getFrameCanvas(0);
+      if (myFileToken !== fileLoadToken) return;
+      $("stage").width = project.width; $("stage").height = project.height;
+      const ctx = $("stage").getContext("2d");
+      if (previewCanvas) ctx.drawImage(previewCanvas, 0, 0, project.width, project.height);
+    } catch(e){
+      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
+    }
+  } else {
+    imageFile = file;
+    setStatus("Carregando imagem…");
+    try {
+      const loaded = await createImageBitmap(file);
+      if (myFileToken !== fileLoadToken) return;
+      imageBitmap = loaded;
+      $("srcInfo").textContent = `${imageBitmap.width}×${imageBitmap.height}`;
+      fitProjectSize(imageBitmap.width, imageBitmap.height);
+      $("stage").width = project.width; $("stage").height = project.height;
+      const ctx = $("stage").getContext("2d");
+      ctx.drawImage(imageBitmap, 0, 0, project.width, project.height);
+      $("applyBtn").disabled = false;
+      setStatus("Imagem carregada. Ajuste os parâmetros e clique em Aplicar.");
+    } catch(e){
+      if (myFileToken === fileLoadToken) setStatus("Erro: " + e.message);
+    }
+  }
+}
+
+/* ---------- controles: tempo/saída (duração via dropdown + região arrastável na timeline) ---------- */
+
+function updateTimelineUI(){
+  const srcDur = videoSrc ? videoSrc.duration : 0;
+  const dur = project.duration;
+  const maxOffset = Math.max(0, srcDur - dur);
+  regionOffset = clamp(regionOffset, 0, maxOffset);
+
+  const pLeft = srcDur > 0 ? (regionOffset/srcDur)*100 : 0;
+  const pWidth = srcDur > 0 ? (dur/srcDur)*100 : 100;
+  const region = $("timelineRegion");
+  region.style.left = pLeft + "%";
+  region.style.width = clamp(pWidth, 0, 100) + "%";
+
+  $("regionVal").textContent = `${regionOffset.toFixed(1)}s – ${(regionOffset+dur).toFixed(1)}s`;
+  updateFrameCount();
+}
+
+/* mostra no canvas o frame exato no início do trecho selecionado — sem isso a barra
+   ficaria "cega" (usuário só veria o resultado depois de clicar Aplicar). */
+let regionPreviewSeq = 0;
+async function showRegionPreviewFrame(t){
+  if (!videoSrc || mode !== "video") return;
+  stopPreviewLoop(); // não deixa um preview de mosh já tocando sobrescrever a prévia do scrub
+  const seq = ++regionPreviewSeq;
+  const frameCanvas = await videoSrc.getFrameCanvas(Math.min(Math.max(0,t), videoSrc.duration - 0.001));
+  if (seq !== regionPreviewSeq || !frameCanvas) return; // resposta antiga/sem frame, descarta
+  const c = $("stage");
+  c.width = project.width; c.height = project.height;
+  c.getContext("2d").drawImage(frameCanvas, 0, 0, c.width, c.height);
+}
+
+$("durSelect").onchange = () => {
+  project.duration = +$("durSelect").value;
+  updateTimelineUI();
+  showRegionPreviewFrame(regionOffset);
+  scheduleAutoApply(); // muda a janela -> precisa recodificar; dispara uma vez só
+};
+
+/* arrastar a região destacada inteira (não alças individuais) para reposicionar o trecho.
+   Durante o arraste só atualiza a prévia leve (frame cru, sem mosh) — re-encodar a cada
+   pixel de movimento seria pesado demais. O encode+mosh completo roda ao SOLTAR. */
+(() => {
+  const region = $("timelineRegion"), bar = $("timelineBar");
+  let dragging = false, startX = 0, startOffset = 0;
+  region.addEventListener("pointerdown", (e) => {
+    if (!videoSrc) return;
+    dragging = true; startX = e.clientX; startOffset = regionOffset;
+    region.setPointerCapture(e.pointerId);
+  });
+  region.addEventListener("pointermove", (e) => {
+    if (!dragging || !videoSrc) return;
+    const barWidth = bar.getBoundingClientRect().width || 1;
+    const deltaSec = ((e.clientX - startX) / barWidth) * videoSrc.duration;
+    regionOffset = startOffset + deltaSec;
+    updateTimelineUI();
+    showRegionPreviewFrame(regionOffset);
+  });
+  const endDrag = () => { if (dragging) scheduleAutoApply(); dragging = false; };
+  region.addEventListener("pointerup", endDrag);
+  region.addEventListener("pointercancel", endDrag);
+})();
+
+$("fpsRange").oninput = () => { project.fps = +$("fpsRange").value; $("fpsVal").textContent = project.fps; updateFrameCount(); };
+function updateFrameCount(){
+  $("frameCount").textContent = Math.max(1, Math.round(project.duration * project.fps));
+}
+updateTimelineUI();
+
+/* ---------- controles: mosh de vídeo + glitch de foto (ambos reaplicam ao vivo, com debounce) ---------- */
+const bindRange = (id, valId, fmt, onChange) => {
+  const el = $(id), out = $(valId);
+  el.oninput = () => { out.textContent = fmt ? fmt(+el.value) : el.value; if (onChange) onChange(); };
+};
+
+/* glitch de foto: pixel-level, sem encode/decode — já é rápido o bastante pra ser ao vivo de verdade */
+let photoAutoApplyTimer = null;
+function schedulePhotoAutoApply(){
+  if (!imageBitmap || mode !== "photo") return;
+  clearTimeout(photoAutoApplyTimer);
+  photoAutoApplyTimer = setTimeout(() => applyPhotoGlitch(), 80);
+}
+
+bindRange("bloomTarget","bloomTargetVal", null, scheduleAutoApply);
+bindRange("bloomCount","bloomCountVal", null, scheduleAutoApply);
+bindRange("corruptCount","corruptCountVal", null, scheduleAutoApply);
+bindRange("corruptIntensity","corruptIntensityVal", null, scheduleAutoApply);
+bindRange("sortMin","sortMinVal", null, schedulePhotoAutoApply);
+bindRange("sortMax","sortMaxVal", null, schedulePhotoAutoApply);
+bindRange("rgbAngle","rgbAngleVal", null, schedulePhotoAutoApply);
+bindRange("rgbAmount","rgbAmountVal", null, schedulePhotoAutoApply);
+
+for (const id of ["meltEnabled","bloomEnabled","corruptEnabled"]) $(id).onchange = scheduleAutoApply;
+$("meltCuts").oninput = scheduleAutoApply;
+$("seedInput").oninput = scheduleAutoApply;
+for (const id of ["sortEnabled","rgbEnabled","sortDir","sortCriterion"]) $(id).onchange = schedulePhotoAutoApply;
+
+$("randSeedBtn").onclick = () => { $("seedInput").value = Math.floor(Math.random()*99999); scheduleAutoApply(); };
+
+/* ---------- aplicar ---------- */
+$("applyBtn").onclick = async () => {
+  if (mode === "video") await applyVideoMosh();
+  else applyPhotoGlitch();
+};
+
+$("playPauseBtn").onclick = () => {
+  previewPlaying = !previewPlaying;
+  $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
+};
+
+/* ---------- cache do encode (a etapa LENTA — só refeita se região/resolução/cortes mudarem) ---------- */
+
+function computeCutIdx(total){
+  const cutsRaw = $("meltCuts").value.trim();
+  if (cutsRaw === "auto" || !cutsRaw) return Math.floor(total/2);
+  return clamp(parseInt(cutsRaw.split(",")[0],10) || Math.floor(total/2), 1, total-1);
+}
+function encodeSignature(total, cutIdx){
+  return [regionOffset.toFixed(2), project.duration, project.fps, project.width, project.height, cutIdx, total].join("|");
+}
+
+async function ensureEncoded(){
+  const fps = project.fps;
+  const total = Math.max(1, Math.round(project.duration * fps));
+  const cutIdx = computeCutIdx(total);
+  const sig = encodeSignature(total, cutIdx);
+  if (cachedEncode && cachedEncode.sig === sig) return cachedEncode;
+
+  setStatus("Codificando frames…"); setProgress(0);
+  const W = project.width, H = project.height;
+  const regionStart = regionOffset, regionEnd = regionOffset + project.duration;
+  const keySet = new Set([0, cutIdx]); // sempre codifica o corte como keyframe; melt decide na hora de usar ou não
+
+  const drawFrame = async (i, ctx, w, h) => {
+    const t = regionStart + (i / Math.max(1,total-1)) * (regionEnd - regionStart);
+    const frameCanvas = await videoSrc.getFrameCanvas(Math.min(t, videoSrc.duration - 0.001));
+    ctx.clearRect(0,0,w,h);
+    if (frameCanvas) ctx.drawImage(frameCanvas, 0, 0, w, h);
+  };
+  const { chunks, decoderDescription, width, height } = await encodeFrames(total, fps, W, H, drawFrame, keySet, setProgress);
+  cachedEncode = { chunks, decoderDescription, width, height, fps, cutIdx, total, sig };
+  return cachedEncode;
+}
+
+/* ---------- aplicar mosh (RÁPIDO — só manipula/decodifica os chunks já codificados) ---------- */
+async function applyVideoMosh(){
+  if (!videoSrc) return;
+  $("applyBtn").disabled = true; $("exportMp4Btn").disabled = true;
+  setProgress(0);
+
+  const seed = +$("seedInput").value || 1;
+  const rng = mulberry32(hashInt(seed));
+
+  try {
+    const enc = await ensureEncoded();
+    const { chunks, decoderDescription, width, height, fps, cutIdx, total } = enc;
+
+    let working = chunks;
+    let decoderNote = "";
+    if ($("meltEnabled").checked){
+      const r = applyMelt(working, [cutIdx]);
+      working = r.chunks;
+    }
+    if ($("bloomEnabled").checked){
+      const r = applyBloom(working, +$("bloomTarget").value, +$("bloomCount").value, fps);
+      working = r.chunks;
+      decoderNote = "Bloom ativo: usando hardwareAcceleration:'prefer-hardware' no preview.";
+    }
+    if ($("corruptEnabled").checked){
+      const intensity01 = (+$("corruptIntensity").value) / 100;
+      const r = applyCorrupt(working, +$("corruptCount").value, intensity01, rng);
+      working = r.chunks;
+      decoderNote = "Corrupção ativa: usando hardwareAcceleration:'prefer-hardware' no preview.";
+    }
+    $("decoderWarn").textContent = decoderNote;
+
+    setStatus("Decodificando preview…"); setProgress(0.55);
+
+    lastMoshResult = { chunks: working, decoderDescription, width, height, fps };
+
+    await playPreview(working, decoderDescription, width, height, fps);
+
+    $("exportMp4Btn").disabled = false;
+    $("playPauseBtn").disabled = false;
+    $("playPauseBtn").textContent = previewPlaying ? "⏸" : "▶";
+    setStatus(`Pronto — ${total} frames, ${working.length} chunks no stream.`);
+    setProgress(null);
+  } catch(e){
+    setStatus("Erro: " + e.message);
+    setProgress(null);
+  }
+  $("applyBtn").disabled = false;
+}
+
+/* reaplica automaticamente (com debounce) quando um parâmetro de mosh muda — só a parte
+   RÁPIDA roda de novo (o encode fica em cache); dá a sensação de "tempo real" possível
+   dentro da técnica real de datamosh (que exige decode, não é um filtro instantâneo). */
+let autoApplyTimer = null;
+function scheduleAutoApply(){
+  if (!videoSrc || mode !== "video") return;
+  clearTimeout(autoApplyTimer);
+  autoApplyTimer = setTimeout(() => applyVideoMosh(), 250);
+}
+
+async function playPreview(chunks, decoderDescription, w, h, fps){
+  const myToken = ++previewLoopToken;
+  const canvas = $("stage"); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  const frames = [];
+  let decodeErrorMsg = null;
+
+  // Importante: fechar cada VideoFrame IMEDIATAMENTE após convertê-lo num bitmap leve.
+  // Decoders de hardware têm um pool pequeno de buffers — acumular VideoFrames abertos
+  // (para tocar depois, em loop) esgota esse pool e trava o decode sem erro nenhum.
+  const pendingConversions = [];
+  await new Promise((resolve) => {
+    decodeChunks(chunks, decoderDescription, w, h,
+      (vf) => {
+        const idx = frames.length; frames.push(null); // reserva a posição na ordem certa
+        const p = createImageBitmap(vf).then(bitmap => { frames[idx] = bitmap; });
+        pendingConversions.push(p);
+        try { vf.close(); } catch(e){} // seguro: createImageBitmap já capturou os dados do frame
+      },
+      (count, errored) => resolve(),
+      (msg, count) => { decodeErrorMsg = `${msg} (parou no frame ${count})`; }
+    );
+  });
+  await Promise.all(pendingConversions);
+
+  if (decodeErrorMsg){
+    setStatus("Aviso: decodificação parou antes do fim — " + decodeErrorMsg + ". Reduza a intensidade.");
+  }
+  if (frames.length === 0) return;
+
+  let i = 0;
+  function loop(){
+    if (myToken !== previewLoopToken){ frames.forEach(f=>{ try{f.close();}catch(e){} }); return; }
+    if (previewPlaying){
+      ctx.drawImage(frames[i], 0, 0, w, h);
+      i = (i + 1) % frames.length;
+    }
+    setTimeout(() => requestAnimationFrame(loop), 1000/fps);
+  }
+  loop();
+}
+
+function applyPhotoGlitch(){
+  if (!imageBitmap) return;
+  const w = project.width, h = project.height;
+  const canvas = $("stage"); canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(imageBitmap, 0, 0, w, h);
+  const imgData = ctx.getImageData(0,0,w,h);
+
+  if ($("sortEnabled").checked){
+    pixelSort(imgData, w, h, {
+      dir: $("sortDir").value,
+      criterion: $("sortCriterion").value,
+      min: +$("sortMin").value,
+      max: +$("sortMax").value
+    });
+  }
+  if ($("rgbEnabled").checked){
+    rgbShift(imgData, w, h, +$("rgbAngle").value, +$("rgbAmount").value);
+  }
+  ctx.putImageData(imgData, 0, 0);
+  lastPhotoResult = canvas;
+  $("exportPngBtn").disabled = false;
+  setStatus("Glitch aplicado.");
+}
+
+/* ---------- export ---------- */
+$("exportPngBtn").onclick = () => {
+  if (!lastPhotoResult) return;
+  lastPhotoResult.toBlob((blob) => downloadBlob(blob, `datamosh-foto-${Date.now()}.png`), "image/png");
+};
+
+$("exportMp4Btn").onclick = async () => {
+  if (!lastMoshResult) return;
+  $("exportMp4Btn").disabled = true;
+  setStatus("Exportando MP4…"); setProgress(0);
+  try {
+    const mb = await loadMediabunny();
+    const { Output, Mp4OutputFormat, BufferTarget, EncodedVideoPacketSource, EncodedPacket } = mb;
+    const target = new BufferTarget();
+    const output = new Output({ format: new Mp4OutputFormat(), target });
+    const source = new EncodedVideoPacketSource("avc");
+    output.addVideoTrack(source, { frameRate: lastMoshResult.fps });
+    await output.start();
+
+    const { chunks, fps, width, height, decoderDescription } = lastMoshResult;
+    for (let i = 0; i < chunks.length; i++){
+      const c = chunks[i];
+      const packet = new EncodedPacket(c.data, c.type, c.timestamp / 1e6, (c.duration || (1e6/fps)) / 1e6);
+      // o 1º pacote precisa do decoderConfig (avcC) — sem isso o Mediabunny rejeita o mux
+      const meta = i === 0 ? { decoderConfig: { codec: CODEC, codedWidth: width, codedHeight: height, description: decoderDescription } } : undefined;
+      await source.add(packet, meta);
+      if (i % 10 === 0) setProgress(i / chunks.length);
+    }
+    await output.finalize();
+    const blob = new Blob([target.buffer], { type: "video/mp4" });
+    downloadBlob(blob, `datamosh-${lastMoshResult.width}x${lastMoshResult.height}-${Date.now()}.mp4`);
+    setStatus("MP4 exportado ✓");
+  } catch(e){
+    setStatus("Falha no export: " + e.message);
+  }
+  setProgress(null);
+  $("exportMp4Btn").disabled = false;
+};
+
+setMode("video");
+</script>
+</body>
+</html>
